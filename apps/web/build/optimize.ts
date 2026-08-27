@@ -17,7 +17,6 @@ const include = [
   "qrcode",
   "intro.js",
   "vue-i18n",
-  "deep-chat",
   "vxe-table",
   "vue-types",
   "js-cookie",
