@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, toRaw } from "vue";
 import reDialog from "./index.vue";
 import { useTimeoutFn } from "@vueuse/core";
 import { withInstall } from "@pureadmin/utils";
@@ -11,6 +11,15 @@ import type {
 } from "./type";
 
 const dialogStore = ref<Array<DialogOptions>>([]);
+const closingDialogs = new Set<DialogOptions>();
+
+const findDialogIndex = (options: DialogOptions, index: number) => {
+  const rawOptions = toRaw(options);
+  const indexedDialog = dialogStore.value[index];
+
+  if (indexedDialog && toRaw(indexedDialog) === rawOptions) return index;
+  return dialogStore.value.findIndex((dialog) => toRaw(dialog) === rawOptions);
+};
 
 /** 打开弹框 */
 const addDialog = (options: DialogOptions) => {
@@ -27,12 +36,21 @@ const addDialog = (options: DialogOptions) => {
 
 /** 关闭弹框 */
 const closeDialog = (options: DialogOptions, index: number, args?: any) => {
-  dialogStore.value[index].visible = false;
-  options.closeCallBack && options.closeCallBack({ options, index, args });
+  const dialogIndex = findDialogIndex(options, index);
+  if (dialogIndex === -1) return;
 
-  const closeDelay = options?.closeDelay ?? 200;
+  const dialog = dialogStore.value[dialogIndex];
+  if (closingDialogs.has(dialog)) return;
+
+  closingDialogs.add(dialog);
+  dialog.visible = false;
+  dialog.closeCallBack?.({ options: dialog, index: dialogIndex, args });
+
+  const closeDelay = dialog.closeDelay ?? 200;
   useTimeoutFn(() => {
-    dialogStore.value.splice(index, 1);
+    const currentIndex = findDialogIndex(dialog, dialogIndex);
+    if (currentIndex !== -1) dialogStore.value.splice(currentIndex, 1);
+    closingDialogs.delete(dialog);
   }, closeDelay);
 };
 
@@ -49,6 +67,7 @@ const updateDialog = (value: any, key = "title", index = 0) => {
 /** 关闭所有弹框 */
 const closeAllDialog = () => {
   dialogStore.value = [];
+  closingDialogs.clear();
 };
 
 /** 千万别忘了在下面这三处引入并注册下，放心注册，不使用`addDialog`调用就不会被挂载

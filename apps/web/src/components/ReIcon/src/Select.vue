@@ -40,6 +40,14 @@ const tabsList = [
   },
 ];
 
+function parseIconValue(value?: string) {
+  const matchedIcon = /^([^:/]+)[:/](.+)$/.exec(value ?? "");
+  if (!matchedIcon) return null;
+
+  const [, prefix, iconName] = matchedIcon;
+  return { iconType: `${prefix}:`, iconName };
+}
+
 const pageList = computed(() =>
   (copyIconList[currentActiveType.value] ?? [])
     .filter((i) => i.includes(filterValue.value))
@@ -51,7 +59,11 @@ const pageList = computed(() =>
 
 const iconItemStyle = computed((): ParameterCSSProperties => {
   return (item) => {
-    if (inputValue.value === currentActiveType.value + item) {
+    const selectedIcon = parseIconValue(inputValue.value);
+    if (
+      selectedIcon?.iconType === currentActiveType.value &&
+      selectedIcon.iconName === item
+    ) {
       return {
         borderColor: "var(--el-color-primary)",
         color: "var(--el-color-primary)",
@@ -61,21 +73,30 @@ const iconItemStyle = computed((): ParameterCSSProperties => {
 });
 
 function setVal() {
-  currentActiveType.value = inputValue.value.substring(
-    0,
-    inputValue.value.indexOf(":") + 1,
-  );
-  icon.value = inputValue.value.substring(inputValue.value.indexOf(":") + 1);
+  const value = inputValue.value ?? "";
+  const selectedIcon = parseIconValue(value);
+
+  if (!selectedIcon) {
+    icon.value = value;
+    return;
+  }
+
+  icon.value = selectedIcon.iconName;
+
+  if (copyIconList[selectedIcon.iconType]) {
+    currentActiveType.value = selectedIcon.iconType;
+  }
 }
 
 function onBeforeEnter() {
   if (isAllEmpty(icon.value)) return;
   setVal();
   // 寻找当前图标在第几页
-  const curIconIndex = copyIconList[currentActiveType.value].findIndex(
+  const curIconIndex = (copyIconList[currentActiveType.value] ?? []).findIndex(
     (i) => i === icon.value,
   );
-  currentPage.value = Math.ceil((curIconIndex + 1) / pageSize.value);
+  currentPage.value =
+    curIconIndex === -1 ? 1 : Math.floor(curIconIndex / pageSize.value) + 1;
 }
 
 function onAfterLeave() {
@@ -104,8 +125,8 @@ function onClear() {
 watch(
   () => pageList.value,
   () =>
-    (totalPage.value = (copyIconList[currentActiveType.value] ?? []).filter((i) =>
-      i.includes(filterValue.value),
+    (totalPage.value = (copyIconList[currentActiveType.value] ?? []).filter(
+      (i) => i.includes(filterValue.value),
     ).length),
   { immediate: true },
 );
