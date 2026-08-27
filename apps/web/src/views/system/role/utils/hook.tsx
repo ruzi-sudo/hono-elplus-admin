@@ -9,8 +9,34 @@ import { addDialog, closeAllDialog } from "@/components/ReDialog";
 import type { FormItemProps } from "../utils/types";
 import type { PaginationProps } from "@pureadmin/table";
 import { getKeyList, deviceDetection } from "@pureadmin/utils";
-import { getRoleList, getRoleMenu, getRoleMenuIds, createRole, updateRole, deleteRole, saveRoleMenu } from "@/api/system";
-import { type Ref, reactive, ref, onMounted, h, toRaw, watch } from "vue";
+import {
+  getRoleList,
+  getRoleMenu,
+  getRoleMenuIds,
+  createRole,
+  updateRole,
+  deleteRole,
+  saveRoleMenu,
+} from "@/api/system";
+import {
+  type Ref,
+  computed,
+  reactive,
+  ref,
+  onMounted,
+  h,
+  toRaw,
+  watch,
+} from "vue";
+
+type RoleMenuItem = {
+  id: number;
+  menuType: number;
+  title: string;
+  path: string;
+  component: string;
+  status: number;
+};
 
 export function useRole(treeRef: Ref) {
   const form = reactive({
@@ -23,6 +49,10 @@ export function useRole(treeRef: Ref) {
   const dataList = ref([]);
   const treeIds = ref([]);
   const treeData = ref([]);
+  const menuPages = ref<RoleMenuItem[]>([]);
+  const checkedMenuIds = ref<number[]>([]);
+  const homePageId = ref<number | null>(null);
+  const activePermissionTab = ref("menu");
   const isShow = ref(false);
   const loading = ref(true);
   const isLinkage = ref(false);
@@ -30,6 +60,9 @@ export function useRole(treeRef: Ref) {
   const switchLoadMap = ref({});
   const isExpandAll = ref(false);
   const isSelectAll = ref(false);
+  const homePageOptions = computed(() =>
+    menuPages.value.filter((item) => checkedMenuIds.value.includes(item.id)),
+  );
   const { switchStyle } = usePublicHooks();
   const treeProps = {
     value: "id",
@@ -107,17 +140,31 @@ export function useRole(treeRef: Ref) {
       await ElMessageBox.confirm(
         `确认要<strong>${row.status === 0 ? "停用" : "启用"}</strong><strong style='color:var(--el-color-primary)'>${row.name}</strong>吗?`,
         "系统提示",
-        { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning", dangerouslyUseHTMLString: true, draggable: true },
+        {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
+          dangerouslyUseHTMLString: true,
+          draggable: true,
+        },
       );
     } catch {
       row.status === 0 ? (row.status = 1) : (row.status = 0);
       return;
     }
-    switchLoadMap.value[index] = { ...switchLoadMap.value[index], loading: true };
+    switchLoadMap.value[index] = {
+      ...switchLoadMap.value[index],
+      loading: true,
+    };
     const { code } = await updateRole({ id: row.id, status: row.status });
-    switchLoadMap.value[index] = { ...switchLoadMap.value[index], loading: false };
+    switchLoadMap.value[index] = {
+      ...switchLoadMap.value[index],
+      loading: false,
+    };
     if (code === 0) {
-      message(`已${row.status === 0 ? "停用" : "启用"}${row.name}`, { type: "success" });
+      message(`已${row.status === 0 ? "停用" : "启用"}${row.name}`, {
+        type: "success",
+      });
     } else {
       row.status === 0 ? (row.status = 1) : (row.status = 0);
     }
@@ -129,7 +176,7 @@ export function useRole(treeRef: Ref) {
       message(`已删除角色 ${row.name}`, { type: "success" });
       onSearch();
     } else {
-      message(msg || '删除失败', { type: "error" });
+      message(msg || "删除失败", { type: "error" });
     }
   }
 
@@ -146,7 +193,11 @@ export function useRole(treeRef: Ref) {
 
   async function onSearch() {
     loading.value = true;
-    const { code, data } = await getRoleList({ ...toRaw(form), pageNum: pagination.currentPage, pageSize: pagination.pageSize });
+    const { code, data } = await getRoleList({
+      ...toRaw(form),
+      pageNum: pagination.currentPage,
+      pageSize: pagination.pageSize,
+    });
     if (code === 0) {
       dataList.value = data.list;
       pagination.total = data.total;
@@ -190,11 +241,20 @@ export function useRole(treeRef: Ref) {
           if (valid) {
             if (title === "新增") {
               const { code, message: msg } = await createRole(curData);
-              if (code !== 0) { message(msg || '创建失败', { type: "error" }); return; }
+              if (code !== 0) {
+                message(msg || "创建失败", { type: "error" });
+                return;
+              }
               message(`已新增角色 ${curData.name}`, { type: "success" });
             } else {
-              const { code, message: msg } = await updateRole({ id: curData.id, ...curData });
-              if (code !== 0) { message(msg || '修改失败', { type: "error" }); return; }
+              const { code, message: msg } = await updateRole({
+                id: curData.id,
+                ...curData,
+              });
+              if (code !== 0) {
+                message(msg || "修改失败", { type: "error" });
+                return;
+              }
               message(`已修改角色 ${curData.name}`, { type: "success" });
             }
             done();
@@ -211,13 +271,28 @@ export function useRole(treeRef: Ref) {
     if (id) {
       curRow.value = row;
       isShow.value = true;
+      activePermissionTab.value = "menu";
       const { code, data } = await getRoleMenuIds({ id });
-      if (code === 0) {
-        treeRef.value.setCheckedKeys(data);
+      if (code === 0 && data) {
+        treeRef.value.setCheckedKeys(data.menuIds);
+        checkedMenuIds.value = data.menuIds;
+        homePageId.value = data.homePageId;
       }
     } else {
       curRow.value = null;
       isShow.value = false;
+      checkedMenuIds.value = [];
+      homePageId.value = null;
+    }
+  }
+
+  function handleTreeCheck(_node, { checkedKeys }) {
+    checkedMenuIds.value = checkedKeys as number[];
+    if (
+      homePageId.value !== null &&
+      !checkedMenuIds.value.includes(homePageId.value)
+    ) {
+      homePageId.value = null;
     }
   }
 
@@ -232,12 +307,16 @@ export function useRole(treeRef: Ref) {
   /** 菜单权限-保存 */
   async function handleSave() {
     const { id, name } = curRow.value;
-    const menuIds = treeRef.value.getCheckedKeys();
-    const { code, message: msg } = await saveRoleMenu({ id, menuIds });
+    const menuIds = treeRef.value.getCheckedKeys() as number[];
+    const { code, message: msg } = await saveRoleMenu({
+      id,
+      menuIds,
+      homePageId: homePageId.value,
+    });
     if (code === 0) {
       message(`角色 ${name} 的菜单权限修改成功`, { type: "success" });
     } else {
-      message(msg || '保存失败', { type: "error" });
+      message(msg || "保存失败", { type: "error" });
     }
   }
 
@@ -255,9 +334,17 @@ export function useRole(treeRef: Ref) {
   onMounted(async () => {
     onSearch();
     const { code, data } = await getRoleMenu();
-    if (code === 0) {
+    if (code === 0 && Array.isArray(data)) {
       treeIds.value = getKeyList(data, "id");
       treeData.value = handleTree(data);
+      menuPages.value = data.filter(
+        (item: RoleMenuItem) =>
+          item.menuType === 0 &&
+          item.status === 1 &&
+          item.path &&
+          item.path !== "/" &&
+          item.component,
+      );
     }
   });
 
@@ -268,9 +355,10 @@ export function useRole(treeRef: Ref) {
   });
 
   watch(isSelectAll, (val) => {
-    val
-      ? treeRef.value.setCheckedKeys(treeIds.value)
-      : treeRef.value.setCheckedKeys([]);
+    const checkedKeys = val ? treeIds.value : [];
+    treeRef.value.setCheckedKeys(checkedKeys);
+    checkedMenuIds.value = checkedKeys;
+    if (!val) homePageId.value = null;
   });
 
   return {
@@ -283,6 +371,9 @@ export function useRole(treeRef: Ref) {
     dataList,
     treeData,
     treeProps,
+    homePageId,
+    homePageOptions,
+    activePermissionTab,
     isLinkage,
     pagination,
     isExpandAll,
@@ -293,6 +384,7 @@ export function useRole(treeRef: Ref) {
     resetForm,
     openDialog,
     handleMenu,
+    handleTreeCheck,
     handleSave,
     handleDelete,
     filterMethod,

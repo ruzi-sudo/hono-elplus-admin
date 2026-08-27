@@ -13,7 +13,7 @@ import { $t, transformI18n } from "@/plugins/i18n";
 import { useLayout } from "@/layout/hooks/useLayout";
 import LoginRegist from "./components/LoginRegist.vue";
 import { useUserStoreHook } from "@/store/modules/user";
-import { initRouter, getTopMenu } from "@/router/utils";
+import { initRouter, getRoleHomeMenu } from "@/router/utils";
 import { bg, avatar, illustration } from "./utils/static";
 import { ref, toRaw, reactive, computed } from "vue";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
@@ -65,17 +65,19 @@ const onLogin = async (formEl: FormInstance | undefined) => {
           username: ruleForm.username,
           password: ruleForm.password,
         })
-        .then(async () => {
+        .then(async ({ data }) => {
           // 获取后端路由
           await initRouter();
           disabled.value = true;
-          const topMenu = getTopMenu(true);
-          router.push(topMenu?.path ?? "/").then(() => {
+          const homeMenu = getRoleHomeMenu(data.homePath, true);
+          router.push(homeMenu?.path ?? "/").then(() => {
             message(t("login.pureLoginSuccess"), { type: "success" });
           });
         })
         .catch((err) => {
-          message(err?.message || err || t("login.pureLoginFail"), { type: "error" });
+          message(err?.message || err || t("login.pureLoginFail"), {
+            type: "error",
+          });
         })
         .finally(() => {
           disabled.value = false;
@@ -99,7 +101,6 @@ useEventListener(document, "keydown", ({ code }) => {
   )
     immediateDebounce(ruleFormRef.value);
 });
-
 </script>
 
 <template>
@@ -236,7 +237,7 @@ useEventListener(document, "keydown", ({ code }) => {
     <div
       class="w-full flex-c absolute bottom-3 text-sm text-[rgba(0,0,0,0.6)] dark:text-[rgba(220,220,242,0.8)]"
     >
-      Copyright © 2020-present
+      Copyright © 2026-present
       <a
         class="hover:text-primary!"
         href="https://github.com/pure-admin"

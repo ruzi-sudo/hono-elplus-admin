@@ -54,6 +54,9 @@ const {
   dataList,
   treeData,
   treeProps,
+  homePageId,
+  homePageOptions,
+  activePermissionTab,
   isLinkage,
   pagination,
   isExpandAll,
@@ -64,6 +67,7 @@ const {
   resetForm,
   openDialog,
   handleMenu,
+  handleTreeCheck,
   handleSave,
   handleDelete,
   filterMethod,
@@ -287,7 +291,7 @@ onMounted(() => {
             <span :class="[iconClass, 'ml-2']">
               <IconifyIconOffline
                 v-tippy="{
-                  content: '保存菜单权限',
+                  content: '保存权限配置',
                 }"
                 class="dark:text-white"
                 width="18px"
@@ -298,35 +302,74 @@ onMounted(() => {
             </span>
           </div>
           <p class="font-bold truncate">
-            菜单权限
+            权限配置
             {{ `${curRow?.name ? `（${curRow.name}）` : ""}` }}
           </p>
         </div>
-        <el-input
-          v-model="treeSearchValue"
-          placeholder="请输入菜单进行搜索"
-          class="mb-1"
-          clearable
-          @input="onQueryChanged"
-        />
-        <div class="flex flex-wrap">
-          <el-checkbox v-model="isExpandAll" label="展开/折叠" />
-          <el-checkbox v-model="isSelectAll" label="全选/全不选" />
-          <el-checkbox v-model="isLinkage" label="父子联动" />
-        </div>
-        <el-tree-v2
-          ref="treeRef"
-          show-checkbox
-          :data="treeData"
-          :props="treeProps"
-          :height="treeHeight"
-          :check-strictly="!isLinkage"
-          :filter-method="filterMethod"
-        >
-          <template #default="{ node }">
-            <span>{{ transformI18n(node.label) }}</span>
-          </template>
-        </el-tree-v2>
+        <el-tabs v-model="activePermissionTab" stretch>
+          <el-tab-pane label="菜单权限" name="menu">
+            <el-input
+              v-model="treeSearchValue"
+              placeholder="请输入菜单进行搜索"
+              class="mb-1"
+              clearable
+              @input="onQueryChanged"
+            />
+            <div class="flex flex-wrap">
+              <el-checkbox v-model="isExpandAll" label="展开/折叠" />
+              <el-checkbox v-model="isSelectAll" label="全选/全不选" />
+              <el-checkbox v-model="isLinkage" label="父子联动" />
+            </div>
+            <el-tree-v2
+              ref="treeRef"
+              show-checkbox
+              :data="treeData"
+              :props="treeProps"
+              :height="treeHeight"
+              :check-strictly="!isLinkage"
+              :filter-method="filterMethod"
+              @check="handleTreeCheck"
+            >
+              <template #default="{ node }">
+                <span>{{ transformI18n(node.label) }}</span>
+              </template>
+            </el-tree-v2>
+          </el-tab-pane>
+          <el-tab-pane label="角色首页" name="home">
+            <el-form label-position="top" class="pt-2">
+              <el-form-item label="登录首页">
+                <el-select
+                  v-if="homePageOptions.length > 0"
+                  v-model="homePageId"
+                  class="w-full"
+                  clearable
+                  filterable
+                  placeholder="请选择角色首页"
+                >
+                  <el-option
+                    v-for="item in homePageOptions"
+                    :key="item.id"
+                    :label="transformI18n(item.title)"
+                    :value="item.id"
+                  >
+                    <div class="flex-bc gap-3">
+                      <span>{{ transformI18n(item.title) }}</span>
+                      <span class="text-xs text-text_color_disabled truncate">
+                        {{ item.path }}
+                      </span>
+                    </div>
+                  </el-option>
+                </el-select>
+                <el-empty
+                  v-else
+                  class="w-full py-6"
+                  description="暂无可用页面"
+                  :image-size="72"
+                />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </div>
   </div>

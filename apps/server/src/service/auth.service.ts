@@ -1,11 +1,27 @@
-import bcrypt from 'bcryptjs';
-import { eq, and, isNotNull, sql, count, desc } from 'drizzle-orm';
-import { getDb } from '../db';
-import { sysUsers, sysRoles, sysUserRoles, sysPages, sysRolePages, sysOnlineUsers, sysLoginLogs } from '../db/schema';
-import { signToken, signRefreshToken } from '../middlewares/auth';
-import { getUserCredentialByRefreshToken, replaceUserCredential, storeUserCredential } from './redis.service';
+import bcrypt from "bcryptjs";
+import { eq, and, ne, isNotNull, sql, count, desc, asc } from "drizzle-orm";
+import { getDb } from "../db";
+import {
+  sysUsers,
+  sysRoles,
+  sysUserRoles,
+  sysPages,
+  sysRolePages,
+  sysOnlineUsers,
+  sysLoginLogs,
+} from "../db/schema";
+import { signToken, signRefreshToken } from "../middlewares/auth";
+import {
+  getUserCredentialByRefreshToken,
+  replaceUserCredential,
+  storeUserCredential,
+} from "./redis.service";
 
-export async function login(username: string, password: string, clientInfo?: { ip?: string; ua?: string }) {
+export async function login(
+  username: string,
+  password: string,
+  clientInfo?: { ip?: string; ua?: string },
+) {
   const db = await getDb();
 
   const [user] = await db
@@ -22,15 +38,15 @@ export async function login(username: string, password: string, clientInfo?: { i
     .limit(1);
 
   if (!user) {
-    throw { code: 10001, message: '用户名或密码错误', status: 400 };
+    throw { code: 10001, message: "用户名或密码错误", status: 400 };
   }
   if (user.status !== 1) {
-    throw { code: 10001, message: '账号已停用', status: 400 };
+    throw { code: 10001, message: "账号已停用", status: 400 };
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    throw { code: 10001, message: '用户名或密码错误', status: 400 };
+    throw { code: 10001, message: "用户名或密码错误", status: 400 };
   }
 
   const roles = await db
@@ -40,9 +56,43 @@ export async function login(username: string, password: string, clientInfo?: { i
     })
     .from(sysRoles)
     .innerJoin(sysUserRoles, eq(sysRoles.id, sysUserRoles.roleId))
-    .where(eq(sysUserRoles.userId, user.id));
+    .where(eq(sysUserRoles.userId, user.id))
+    .orderBy(asc(sysRoles.id));
 
-  const roleCodes = roles.map(r => r.code);
+  const roleCodes = roles.map((r) => r.code);
+
+  const [homePage] = await db
+    .select({ path: sysPages.path })
+    .from(sysRoles)
+    .innerJoin(
+      sysUserRoles,
+      and(
+        eq(sysRoles.id, sysUserRoles.roleId),
+        eq(sysUserRoles.userId, user.id),
+      ),
+    )
+    .innerJoin(
+      sysRolePages,
+      and(
+        eq(sysRolePages.roleId, sysRoles.id),
+        eq(sysRolePages.pageId, sysRoles.homePageId),
+      ),
+    )
+    .innerJoin(sysPages, eq(sysPages.id, sysRoles.homePageId))
+    .where(
+      and(
+        eq(sysRoles.status, 1),
+        eq(sysPages.status, 1),
+        ne(sysPages.menuType, 1),
+        ne(sysPages.path, "/"),
+        isNotNull(sysPages.path),
+        isNotNull(sysPages.component),
+        sql`${sysPages.path} != ''`,
+        sql`${sysPages.component} != ''`,
+      ),
+    )
+    .orderBy(asc(sysRoles.id))
+    .limit(1);
 
   const perms = await db
     .select({ auths: sysPages.auths })
@@ -57,55 +107,78 @@ export async function login(username: string, password: string, clientInfo?: { i
       ),
     );
 
-  const permList = perms.map(p => p.auths!).filter(Boolean);
+  const permList = perms.map((p) => p.auths!).filter(Boolean);
 
-  const payload = { userId: user.id, username: user.username, roles: roleCodes };
+  const payload = {
+    userId: user.id,
+    username: user.username,
+    roles: roleCodes,
+  };
   const accessToken = signToken(payload);
-  const refreshToken = signRefreshToken({ userId: user.id, username: user.username });
+  const refreshToken = signRefreshToken({
+    userId: user.id,
+    username: user.username,
+  });
   let credentialStored = false;
   let onlineUserId: number | null = null;
 
   // 记录在线用户
   try {
-    const ua = clientInfo?.ua || '';
+    const ua = clientInfo?.ua || "";
     const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge|Opera)\/[\d.]+/);
-    const browser = browserMatch ? browserMatch[0] : '未知';
+    const browser = browserMatch ? browserMatch[0] : "未知";
     const systemMatch = ua.match(/\(([^)]+)\)/);
-    let system = '未知';
+    let system = "未知";
     if (systemMatch) {
       const raw = systemMatch[1];
-      if (/Windows NT/.test(raw)) system = 'Windows';
-      else if (/Mac OS X/.test(raw)) system = 'macOS';
-      else if (/Linux/.test(raw) && !/Android/.test(raw)) system = 'Linux';
-      else if (/Android/.test(raw)) system = 'Android';
-      else if (/iOS/.test(raw)) system = 'iOS';
+      if (/Windows NT/.test(raw)) system = "Windows";
+      else if (/Mac OS X/.test(raw)) system = "macOS";
+      else if (/Linux/.test(raw) && !/Android/.test(raw)) system = "Linux";
+      else if (/Android/.test(raw)) system = "Android";
+      else if (/iOS/.test(raw)) system = "iOS";
     }
 
-    const ip = clientInfo?.ip || '127.0.0.1';
+    const ip = clientInfo?.ip || "127.0.0.1";
     // 异步查询 IP 归属地，不阻塞登录
-    let address = '';
-    const isPrivate = /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$)/.test(ip);
+    let address = "";
+    const isPrivate =
+      /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$)/.test(ip);
     if (ip && !isPrivate) {
-      lookupIpAddress(ip).then(addr => {
-        if (addr) {
-          getDb().then(db =>
-            db.update(sysOnlineUsers)
-              .set({ address: addr } as Partial<typeof sysOnlineUsers.$inferInsert>)
-              .where(and(eq(sysOnlineUsers.username, user.username), eq(sysOnlineUsers.ip, ip)))
-          ).catch(() => {});
-        }
-      }).catch(() => {});
+      lookupIpAddress(ip)
+        .then((addr) => {
+          if (addr) {
+            getDb()
+              .then((db) =>
+                db
+                  .update(sysOnlineUsers)
+                  .set({ address: addr } as Partial<
+                    typeof sysOnlineUsers.$inferInsert
+                  >)
+                  .where(
+                    and(
+                      eq(sysOnlineUsers.username, user.username),
+                      eq(sysOnlineUsers.ip, ip),
+                    ),
+                  ),
+              )
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
     }
 
-    const [onlineUser] = await db.insert(sysOnlineUsers).values({
-      userId: user.id,
-      username: user.username,
-      ip,
-      address,
-      system,
-      browser,
-      loginTime: new Date(),
-    } as typeof sysOnlineUsers.$inferInsert).$returningId();
+    const [onlineUser] = await db
+      .insert(sysOnlineUsers)
+      .values({
+        userId: user.id,
+        username: user.username,
+        ip,
+        address,
+        system,
+        browser,
+        loginTime: new Date(),
+      } as typeof sysOnlineUsers.$inferInsert)
+      .$returningId();
 
     if (onlineUser?.id) {
       onlineUserId = onlineUser.id;
@@ -129,29 +202,42 @@ export async function login(username: string, password: string, clientInfo?: { i
       status: 1,
       loginTime: new Date(),
     } as typeof sysLoginLogs.$inferInsert);
-  } catch { /* 非关键 */ }
+  } catch {
+    /* 非关键 */
+  }
 
   if (!credentialStored) {
     if (onlineUserId) {
-      await db.delete(sysOnlineUsers).where(eq(sysOnlineUsers.id, onlineUserId));
+      await db
+        .delete(sysOnlineUsers)
+        .where(eq(sysOnlineUsers.id, onlineUserId));
     }
-    throw { code: 10002, message: '登录凭证写入失败，请稍后重试', status: 500 };
+    throw { code: 10002, message: "登录凭证写入失败，请稍后重试", status: 500 };
   }
 
   return {
-    avatar: user.avatar || '',
+    avatar: user.avatar || "",
     username: user.username,
     roles: roleCodes,
-    permissions: roleCodes.includes('admin') ? ['*:*:*'] : permList,
+    permissions: roleCodes.includes("admin") ? ["*:*:*"] : permList,
+    homePath: homePage?.path || "",
     accessToken,
     refreshToken,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      .toISOString()
+      .replace("T", " ")
+      .slice(0, 19),
   };
 }
 
-export async function register(username: string, email: string, password: string, confirmPassword: string) {
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+  confirmPassword: string,
+) {
   if (password !== confirmPassword) {
-    throw { code: 10001, message: '两次输入的密码不一致', status: 400 };
+    throw { code: 10001, message: "两次输入的密码不一致", status: 400 };
   }
 
   const db = await getDb();
@@ -161,7 +247,7 @@ export async function register(username: string, email: string, password: string
     .where(eq(sysUsers.username, username))
     .limit(1);
   if (existingUser) {
-    throw { code: 10001, message: '用户名已存在', status: 400 };
+    throw { code: 10001, message: "用户名已存在", status: 400 };
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -176,7 +262,7 @@ export async function register(username: string, email: string, password: string
   const [commonRole] = await db
     .select({ id: sysRoles.id })
     .from(sysRoles)
-    .where(eq(sysRoles.code, 'common'))
+    .where(eq(sysRoles.code, "common"))
     .limit(1);
 
   if (commonRole) {
@@ -188,20 +274,30 @@ export async function register(username: string, email: string, password: string
 
 export async function refreshToken(token: string) {
   if (!token) {
-    throw { code: 10001, message: '请求参数缺失或格式不正确', status: 400 };
+    throw { code: 10001, message: "请求参数缺失或格式不正确", status: 400 };
   }
 
-  const jwt = await import('jsonwebtoken');
-  const JWT_SECRET = process.env.JWT_SECRET || 'pureadmin-jwt-secret-key';
-  const decoded = jwt.default.verify(token, JWT_SECRET) as { userId: number; username: string };
+  const jwt = await import("jsonwebtoken");
+  const JWT_SECRET = process.env.JWT_SECRET || "pureadmin-jwt-secret-key";
+  const decoded = jwt.default.verify(token, JWT_SECRET) as {
+    userId: number;
+    username: string;
+  };
   const oldCredential = await getUserCredentialByRefreshToken(token);
   if (!oldCredential) {
-    throw { code: 10001, message: '登录状态已过期，请重新登录', status: 401 };
+    throw { code: 10001, message: "登录状态已过期，请重新登录", status: 401 };
   }
 
-  const payload = { userId: decoded.userId, username: decoded.username, roles: [] as string[] };
+  const payload = {
+    userId: decoded.userId,
+    username: decoded.username,
+    roles: [] as string[],
+  };
   const accessToken = signToken(payload);
-  const newRefreshToken = signRefreshToken({ userId: decoded.userId, username: decoded.username });
+  const newRefreshToken = signRefreshToken({
+    userId: decoded.userId,
+    username: decoded.username,
+  });
   const replaced = await replaceUserCredential(oldCredential, {
     userId: decoded.userId,
     username: decoded.username,
@@ -210,25 +306,37 @@ export async function refreshToken(token: string) {
     refreshToken: newRefreshToken,
   });
   if (!replaced) {
-    throw { code: 10002, message: '登录凭证刷新失败，请重新登录', status: 500 };
+    throw { code: 10002, message: "登录凭证刷新失败，请重新登录", status: 500 };
   }
 
   return {
     accessToken,
     refreshToken: newRefreshToken,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      .toISOString()
+      .replace("T", " ")
+      .slice(0, 19),
   };
 }
 
 /** 通过 ip-api.com 免费接口查询 IP 归属地（中国区可正常返回中文地址） */
 async function lookupIpAddress(ip: string): Promise<string> {
   try {
-    const res = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return '';
-    const data = await res.json() as { status: string; country: string; regionName: string; city: string };
-    if (data.status === 'success') {
+    const res = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as {
+      status: string;
+      country: string;
+      regionName: string;
+      city: string;
+    };
+    if (data.status === "success") {
       return `${data.country}${data.regionName}${data.city}`;
     }
-  } catch { /* 超时或失败时跳过 */ }
-  return '';
+  } catch {
+    /* 超时或失败时跳过 */
+  }
+  return "";
 }

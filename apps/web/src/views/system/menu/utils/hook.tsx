@@ -4,11 +4,52 @@ import { message } from "@/utils/message";
 import { getMenuList, createMenu, updateMenu, deleteMenu } from "@/api/system";
 import { transformI18n } from "@/plugins/i18n";
 import { addDialog } from "@/components/ReDialog";
+import { ElMessageBox } from "element-plus";
 import { reactive, ref, onMounted, h } from "vue";
 import type { FormItemProps } from "../utils/types";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { cloneDeep, isAllEmpty, deviceDetection } from "@pureadmin/utils";
 import { usePublicHooks } from "../../hooks";
+
+const ROLE_HOME_PAGE_IN_USE = "ROLE_HOME_PAGE_IN_USE";
+
+async function handleMenuOperationError(
+  error: any,
+  title: string,
+  fallbackMessage: string,
+) {
+  let errorMessage = error?.message || fallbackMessage;
+  if (error?.data?.reason !== ROLE_HOME_PAGE_IN_USE) {
+    message(errorMessage, { type: "error" });
+    return;
+  }
+
+  const assignments = error?.data?.assignments;
+  if (Array.isArray(assignments) && assignments.length > 0) {
+    const visibleAssignments = assignments
+      .slice(0, 5)
+      .map(
+        (item) =>
+          `“${transformI18n(item.pageTitle)}”（角色：${item.roleName}）`,
+      )
+      .join("、");
+    const hiddenCount = assignments.length - 5;
+    const suffix = hiddenCount > 0 ? `等 ${assignments.length} 项` : "";
+    errorMessage = `${visibleAssignments}${suffix}已被设置为角色首页，请先在角色权限中取消首页设置`;
+  }
+
+  try {
+    await ElMessageBox.alert(errorMessage, title, {
+      type: "warning",
+      confirmButtonText: "知道了",
+      showClose: false,
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+    });
+  } catch {
+    // Alert is informational; closing it does not change menu state.
+  }
+}
 
 export function useMenu() {
   const form = reactive({
@@ -138,7 +179,7 @@ export function useMenu() {
   }
 
   function filterMenusWithAncestors(list, keyword: string) {
-    const menuMap = new Map(list.map(item => [item.id, item]));
+    const menuMap = new Map(list.map((item) => [item.id, item]));
     const includeIds = new Set<number>();
     for (const item of list) {
       if (!transformI18n(item.title).includes(keyword)) continue;
@@ -148,7 +189,7 @@ export function useMenu() {
         current = menuMap.get(current.parentId);
       }
     }
-    return list.filter(item => includeIds.has(item.id));
+    return list.filter((item) => includeIds.has(item.id));
   }
 
   function formatHigherMenuOptions(treeList, currentId?: number) {
@@ -157,7 +198,10 @@ export function useMenu() {
     for (let i = 0; i < treeList.length; i++) {
       if (treeList[i].menuType === 1 || treeList[i].id === currentId) continue;
       treeList[i].title = transformI18n(treeList[i].title);
-      treeList[i].children = formatHigherMenuOptions(treeList[i].children, currentId);
+      treeList[i].children = formatHigherMenuOptions(
+        treeList[i].children,
+        currentId,
+      );
       newTreeList.push(treeList[i]);
     }
     return newTreeList;
@@ -170,7 +214,10 @@ export function useMenu() {
         formInline: {
           id: row?.id ?? null,
           menuType: row?.menuType ?? 0,
-          higherMenuOptions: formatHigherMenuOptions(handleTree(cloneDeep(flatMenuList.value)), row?.id),
+          higherMenuOptions: formatHigherMenuOptions(
+            handleTree(cloneDeep(flatMenuList.value)),
+            row?.id,
+          ),
           parentId: row?.parentId ?? 0,
           title: row?.title ?? "",
           name: row?.name ?? "",
@@ -205,12 +252,35 @@ export function useMenu() {
           if (valid) {
             if (title === "新增") {
               const { code, message: msg } = await createMenu(curData);
-              if (code !== 0) { message(msg || '创建失败', { type: "error" }); return; }
-              message(`已新增菜单 ${transformI18n(curData.title)}`, { type: "success" });
+              if (code !== 0) {
+                message(msg || "创建失败", { type: "error" });
+                return;
+              }
+              message(`已新增菜单 ${transformI18n(curData.title)}`, {
+                type: "success",
+              });
             } else {
-              const { code, message: msg } = await updateMenu({ id: row?.id, ...curData });
-              if (code !== 0) { message(msg || '修改失败', { type: "error" }); return; }
-              message(`已修改菜单 ${transformI18n(curData.title)}`, { type: "success" });
+              try {
+                const result = await updateMenu({ id: row?.id, ...curData });
+                if (result.code !== 0) {
+                  await handleMenuOperationError(
+                    result,
+                    curData.status === 0 ? "无法停用菜单" : "修改失败",
+                    "修改失败",
+                  );
+                  return;
+                }
+              } catch (error) {
+                await handleMenuOperationError(
+                  error,
+                  curData.status === 0 ? "无法停用菜单" : "修改失败",
+                  "修改失败",
+                );
+                return;
+              }
+              message(`已修改菜单 ${transformI18n(curData.title)}`, {
+                type: "success",
+              });
             }
             done();
             onSearch();
@@ -221,12 +291,16 @@ export function useMenu() {
   }
 
   async function handleDelete(row) {
-    const { code, message: msg } = await deleteMenu({ id: row.id });
-    if (code === 0) {
+    try {
+      const result = await deleteMenu({ id: row.id });
+      if (result.code !== 0) {
+        await handleMenuOperationError(result, "无法删除菜单", "删除失败");
+        return;
+      }
       message(`已删除菜单 ${transformI18n(row.title)}`, { type: "success" });
       onSearch();
-    } else {
-      message(msg || '删除失败', { type: "error" });
+    } catch (error) {
+      await handleMenuOperationError(error, "无法删除菜单", "删除失败");
     }
   }
 
@@ -234,15 +308,28 @@ export function useMenu() {
     const oldStatus = row.status;
     const newStatus = Number(value);
     switchLoadMap.value[row.id] = { loading: true };
-    const { code, message: msg } = await updateMenu({ id: row.id, status: newStatus });
-    if (code === 0) {
+    try {
+      const result = await updateMenu({ id: row.id, status: newStatus });
+      if (result.code !== 0) {
+        await handleMenuOperationError(
+          result,
+          newStatus === 0 ? "无法停用菜单" : "操作失败",
+          "操作失败",
+        );
+        return;
+      }
       row.status = newStatus;
-      message(newStatus === 1 ? '已启用' : '已停用', { type: "success" });
-    } else {
+      message(newStatus === 1 ? "已启用" : "已停用", { type: "success" });
+    } catch (error) {
       row.status = oldStatus;
-      message(msg || '操作失败', { type: "error" });
+      await handleMenuOperationError(
+        error,
+        newStatus === 0 ? "无法停用菜单" : "操作失败",
+        "操作失败",
+      );
+    } finally {
+      switchLoadMap.value[row.id] = { loading: false };
     }
-    switchLoadMap.value[row.id] = { loading: false };
   }
 
   onMounted(() => {

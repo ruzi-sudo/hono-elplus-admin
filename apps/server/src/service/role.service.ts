@@ -1,7 +1,13 @@
-import { eq, like, and, count, desc, inArray } from 'drizzle-orm';
-import bcrypt from 'bcryptjs';
-import { getDb } from '../db';
-import { sysRoles, sysUserRoles, sysRolePages, sysUsers } from '../db/schema';
+import { eq, like, and, count, desc, inArray } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import { getDb } from "../db";
+import {
+  sysRoles,
+  sysUserRoles,
+  sysRolePages,
+  sysUsers,
+  sysPages,
+} from "../db/schema";
 
 export async function listAllRoles() {
   const db = await getDb();
@@ -18,7 +24,29 @@ export async function getRoleIdsByUserId(userId: number) {
     .select({ roleId: sysUserRoles.roleId })
     .from(sysUserRoles)
     .where(eq(sysUserRoles.userId, userId));
-  return rows.map(r => r.roleId);
+  return rows.map((r) => r.roleId);
+}
+
+export async function getRolePermission(roleId: number) {
+  const db = await getDb();
+  const [role] = await db
+    .select({ homePageId: sysRoles.homePageId })
+    .from(sysRoles)
+    .where(eq(sysRoles.id, roleId))
+    .limit(1);
+  if (!role) {
+    throw { code: 10003, message: "角色不存在", status: 404 };
+  }
+
+  const rows = await db
+    .select({ pageId: sysRolePages.pageId })
+    .from(sysRolePages)
+    .where(eq(sysRolePages.roleId, roleId));
+
+  return {
+    menuIds: rows.map((row) => row.pageId),
+    homePageId: role.homePageId ?? null,
+  };
 }
 
 export async function listRoles(params: {
@@ -33,7 +61,8 @@ export async function listRoles(params: {
 
   const conditions = [];
   if (params.name) conditions.push(like(sysRoles.name, `%${params.name}%`));
-  if (params.status !== undefined && params.status !== null) conditions.push(eq(sysRoles.status, params.status));
+  if (params.status !== undefined && params.status !== null)
+    conditions.push(eq(sysRoles.status, params.status));
   if (params.code) {
     const codes = Array.isArray(params.code) ? params.code : [params.code];
     conditions.push(inArray(sysRoles.code, codes));
@@ -63,12 +92,12 @@ export async function listRoles(params: {
     .limit(pageSize)
     .offset(offset);
 
-  const list = roles.map(r => ({
+  const list = roles.map((r) => ({
     id: r.id,
     name: r.name,
     code: r.code,
     status: r.status ?? 1,
-    remark: r.remark || '',
+    remark: r.remark || "",
     createTime: r.createTime ? new Date(r.createTime).getTime() : Date.now(),
     updateTime: r.updateTime ? new Date(r.updateTime).getTime() : Date.now(),
   }));
@@ -90,7 +119,7 @@ export async function createRole(params: {
     .where(eq(sysRoles.code, params.code))
     .limit(1);
   if (existing) {
-    throw { code: 10001, message: '角色标识已存在', status: 400 };
+    throw { code: 10001, message: "角色标识已存在", status: 400 };
   }
 
   const [result] = await db.insert(sysRoles).values({
@@ -118,7 +147,7 @@ export async function updateRole(params: {
     .where(eq(sysRoles.id, params.id))
     .limit(1);
   if (!existing) {
-    throw { code: 10003, message: '角色不存在', status: 404 };
+    throw { code: 10003, message: "角色不存在", status: 404 };
   }
 
   const updateData: Record<string, any> = {};
@@ -142,7 +171,7 @@ export async function deleteRole(id: number) {
     .where(eq(sysRoles.id, id))
     .limit(1);
   if (!existing) {
-    throw { code: 10003, message: '角色不存在', status: 404 };
+    throw { code: 10003, message: "角色不存在", status: 404 };
   }
 
   // 先删除角色关联的权限和用户关系
@@ -156,17 +185,21 @@ export async function deleteRole(id: number) {
 
 async function ensureFallbackRole(db: any) {
   // 查出所有无角色的用户
-  const hasRoleRows = await db.select({ userId: sysUserRoles.userId }).from(sysUserRoles);
-  const hasRoleIds = [...new Set(hasRoleRows.map(r => r.userId))];
+  const hasRoleRows = await db
+    .select({ userId: sysUserRoles.userId })
+    .from(sysUserRoles);
+  const hasRoleIds = [...new Set(hasRoleRows.map((r) => r.userId))];
   const allUsers = await db.select({ id: sysUsers.id }).from(sysUsers);
-  const orphanUserIds = allUsers.filter(u => !hasRoleIds.includes(u.id)).map(u => u.id);
+  const orphanUserIds = allUsers
+    .filter((u) => !hasRoleIds.includes(u.id))
+    .map((u) => u.id);
   if (orphanUserIds.length === 0) return;
 
   // 查找 common 角色（前端已禁用删除，肯定存在）
   const [commonRole] = await db
     .select({ id: sysRoles.id })
     .from(sysRoles)
-    .where(eq(sysRoles.code, 'common'))
+    .where(eq(sysRoles.code, "common"))
     .limit(1);
   if (!commonRole) return;
 
@@ -175,16 +208,82 @@ async function ensureFallbackRole(db: any) {
   }
 }
 
-export async function saveRoleMenu(id: number, menuIds: number[]) {
+export async function saveRoleMenu(
+  id: number,
+  menuIds: number[],
+  homePageId: number | null,
+) {
   const db = await getDb();
+  const uniqueMenuIds = [...new Set(menuIds)];
 
-  // 先删除旧权限
-  await db.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
-
-  // 插入新权限
-  if (menuIds.length > 0) {
-    await db.insert(sysRolePages).values(
-      menuIds.map(menuId => ({ roleId: id, pageId: menuId }))
-    );
+  const [role] = await db
+    .select({ id: sysRoles.id })
+    .from(sysRoles)
+    .where(eq(sysRoles.id, id))
+    .limit(1);
+  if (!role) {
+    throw { code: 10003, message: "角色不存在", status: 404 };
   }
+
+  if (uniqueMenuIds.length > 0) {
+    const pages = await db
+      .select({ id: sysPages.id })
+      .from(sysPages)
+      .where(inArray(sysPages.id, uniqueMenuIds));
+    if (pages.length !== uniqueMenuIds.length) {
+      throw { code: 10001, message: "菜单权限中包含不存在的页面", status: 400 };
+    }
+  }
+
+  if (homePageId !== null) {
+    if (!uniqueMenuIds.includes(homePageId)) {
+      throw {
+        code: 10001,
+        message: "角色首页必须包含在菜单权限中",
+        status: 400,
+      };
+    }
+    const [homePage] = await db
+      .select({
+        menuType: sysPages.menuType,
+        path: sysPages.path,
+        component: sysPages.component,
+        status: sysPages.status,
+      })
+      .from(sysPages)
+      .where(eq(sysPages.id, homePageId))
+      .limit(1);
+    if (
+      !homePage ||
+      homePage.menuType === 1 ||
+      homePage.status !== 1 ||
+      !homePage.path ||
+      homePage.path === "/" ||
+      !homePage.component
+    ) {
+      throw {
+        code: 10001,
+        message: "角色首页必须是已启用且可访问的页面",
+        status: 400,
+      };
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
+    if (uniqueMenuIds.length > 0) {
+      await tx
+        .insert(sysRolePages)
+        .values(
+          uniqueMenuIds.map((menuId) => ({ roleId: id, pageId: menuId })),
+        );
+    }
+    await tx
+      .update(sysRoles)
+      .set({
+        homePageId,
+        updatedAt: new Date(),
+      } as Partial<typeof sysRoles.$inferInsert>)
+      .where(eq(sysRoles.id, id));
+  });
 }

@@ -88,6 +88,7 @@ export const updateMenu = createRoute({
   },
   responses: {
     '200': { description: '修改成功' },
+    '400': { description: '菜单被角色首页引用或参数错误', content: { 'application/json': { schema: ErrorResponseSchema } } },
     '401': { description: '未授权', content: { 'application/json': { schema: ErrorResponseSchema } } },
   },
 });
@@ -103,6 +104,7 @@ export const deleteMenu = createRoute({
   },
   responses: {
     '200': { description: '删除成功' },
+    '400': { description: '菜单被角色首页引用或参数错误', content: { 'application/json': { schema: ErrorResponseSchema } } },
     '401': { description: '未授权', content: { 'application/json': { schema: ErrorResponseSchema } } },
   },
 });

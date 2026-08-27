@@ -20,14 +20,36 @@ route.openapi(routes.createMenu, async (c) => {
 
 route.openapi(routes.updateMenu, async (c) => {
   const body = c.req.valid('json');
-  await menuService.updateMenu(body);
-  return c.json({ code: 0, message: '操作成功', data: {} });
+  try {
+    await menuService.updateMenu(body);
+    return c.json({ code: 0, message: '操作成功', data: {} });
+  } catch (err: any) {
+    return c.json(
+      {
+        code: err.code || 10001,
+        message: err.message || '修改失败',
+        data: err.data || {},
+      },
+      err.status || 400,
+    );
+  }
 });
 
 route.openapi(routes.deleteMenu, async (c) => {
   const body = c.req.valid('json');
-  await menuService.deleteMenu(body.id);
-  return c.json({ code: 0, message: '操作成功', data: {} });
+  try {
+    await menuService.deleteMenu(body.id);
+    return c.json({ code: 0, message: '操作成功', data: {} });
+  } catch (err: any) {
+    return c.json(
+      {
+        code: err.code || 10001,
+        message: err.message || '删除失败',
+        data: err.data || {},
+      },
+      err.status || 400,
+    );
+  }
 });
 
 route.openapi(routes.getAsyncRoutes, async (c) => {

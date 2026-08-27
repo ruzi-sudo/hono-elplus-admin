@@ -1,6 +1,6 @@
-import { eq, and, ne, inArray, isNotNull, count, desc, asc } from 'drizzle-orm';
-import { getDb } from '../db';
-import { sysPages, sysRoles, sysRolePages } from '../db/schema';
+import { eq, and, ne, inArray, isNotNull, count, desc, asc } from "drizzle-orm";
+import { getDb } from "../db";
+import { sysPages, sysRoles, sysRolePages } from "../db/schema";
 
 function mapPage(p: {
   id: number;
@@ -30,17 +30,17 @@ function mapPage(p: {
     id: p.id,
     menuType: p.menuType ?? 0,
     title: p.title,
-    name: p.name || '',
-    path: p.path || '',
-    component: p.component || '',
+    name: p.name || "",
+    path: p.path || "",
+    component: p.component || "",
     rank: p.rank,
-    redirect: p.redirect || '',
-    icon: p.icon || '',
-    extraIcon: p.extraIcon || '',
-    enterTransition: p.enterTransition || '',
-    leaveTransition: p.leaveTransition || '',
-    activePath: p.activePath || '',
-    auths: p.auths || '',
+    redirect: p.redirect || "",
+    icon: p.icon || "",
+    extraIcon: p.extraIcon || "",
+    enterTransition: p.enterTransition || "",
+    leaveTransition: p.leaveTransition || "",
+    activePath: p.activePath || "",
+    auths: p.auths || "",
     keepAlive: p.keepAlive === 1,
     hiddenTag: p.hiddenTag === 1,
     fixedTag: p.fixedTag === 1,
@@ -67,14 +67,20 @@ export async function getRoleMenuTree() {
       id: sysPages.id,
       menuType: sysPages.menuType,
       title: sysPages.title,
+      path: sysPages.path,
+      component: sysPages.component,
+      status: sysPages.status,
     })
     .from(sysPages)
     .orderBy(asc(sysPages.parentId), asc(sysPages.id));
-  return rows.map(r => ({
+  return rows.map((r) => ({
     parentId: r.parentId ?? 0,
     id: r.id,
     menuType: r.menuType ?? 0,
     title: r.title,
+    path: r.path || "",
+    component: r.component || "",
+    status: r.status ?? 1,
   }));
 }
 
@@ -84,24 +90,19 @@ export async function getMenuIdsByRoleId(roleId: number) {
     .select({ pageId: sysRolePages.pageId })
     .from(sysRolePages)
     .where(eq(sysRolePages.roleId, roleId));
-  return rows.map(r => r.pageId);
+  return rows.map((r) => r.pageId);
 }
 
 export async function getAsyncRoutes(roles: string[]) {
   const db = await getDb();
-  const isAdmin = roles.includes('admin');
+  const isAdmin = roles.includes("admin");
 
-  let pages: typeof sysPages.$inferSelect[];
+  let pages: (typeof sysPages.$inferSelect)[];
   if (isAdmin) {
     pages = await db
       .select()
       .from(sysPages)
-      .where(
-        and(
-          ne(sysPages.menuType, 1),
-          eq(sysPages.status, 1),
-        ),
-      )
+      .where(and(ne(sysPages.menuType, 1), eq(sysPages.status, 1)))
       .orderBy(asc(sysPages.parentId), asc(sysPages.rank), asc(sysPages.id));
   } else {
     const roleRows = await db
@@ -109,7 +110,7 @@ export async function getAsyncRoutes(roles: string[]) {
       .from(sysRoles)
       .where(inArray(sysRoles.code, roles));
 
-    const roleIds = roleRows.map(r => r.id);
+    const roleIds = roleRows.map((r) => r.id);
     if (roleIds.length === 0) return [];
 
     const pageRows = await db
@@ -124,7 +125,7 @@ export async function getAsyncRoutes(roles: string[]) {
         ),
       );
 
-    const pageIds = pageRows.map(r => r.id);
+    const pageIds = pageRows.map((r) => r.id);
     if (pageIds.length === 0) return [];
 
     const allActivePages = await db
@@ -134,15 +135,20 @@ export async function getAsyncRoutes(roles: string[]) {
       .orderBy(asc(sysPages.parentId), asc(sysPages.rank), asc(sysPages.id));
 
     const includeIds = collectPageIdsWithAncestors(allActivePages, pageIds);
-    pages = allActivePages.filter(p => includeIds.has(p.id) && p.menuType !== 1);
+    pages = allActivePages.filter(
+      (p) => includeIds.has(p.id) && p.menuType !== 1,
+    );
   }
 
   return buildRouterTree(pages);
 }
 
-function collectPageIdsWithAncestors(pages: typeof sysPages.$inferSelect[], pageIds: number[]) {
+function collectPageIdsWithAncestors(
+  pages: (typeof sysPages.$inferSelect)[],
+  pageIds: number[],
+) {
   const includeIds = new Set(pageIds);
-  const pageMap = new Map(pages.map(p => [p.id, p]));
+  const pageMap = new Map(pages.map((p) => [p.id, p]));
 
   for (const pageId of pageIds) {
     let cursor = pageMap.get(pageId);
@@ -155,13 +161,13 @@ function collectPageIdsWithAncestors(pages: typeof sysPages.$inferSelect[], page
   return includeIds;
 }
 
-function buildRouterTree(pages: typeof sysPages.$inferSelect[]) {
+function buildRouterTree(pages: (typeof sysPages.$inferSelect)[]) {
   // 排除根 Layout（path="/"），home.ts 已定义
-  const filteredPages = pages.filter(p => p.path !== '/' && p.menuType !== 1);
-  const layoutId = pages.find(p => p.path === '/')?.id;
+  const filteredPages = pages.filter((p) => p.path !== "/" && p.menuType !== 1);
+  const layoutId = pages.find((p) => p.path === "/")?.id;
 
-  const layoutPage = pages.find(p => p.path === '/');
-  const childrenMap = new Map<number, typeof sysPages.$inferSelect[]>();
+  const layoutPage = pages.find((p) => p.path === "/");
+  const childrenMap = new Map<number, (typeof sysPages.$inferSelect)[]>();
   for (const page of filteredPages) {
     const parentId = page.parentId ?? 0;
     if (!childrenMap.has(parentId)) childrenMap.set(parentId, []);
@@ -171,7 +177,7 @@ function buildRouterTree(pages: typeof sysPages.$inferSelect[]) {
   const toRoute = (page: typeof sysPages.$inferSelect) => {
     const children = (childrenMap.get(page.id) || []).map(toRoute);
     return {
-      path: page.path || '',
+      path: page.path || "",
       name: page.name || undefined,
       component: page.component || undefined,
       redirect: page.redirect || undefined,
@@ -183,7 +189,7 @@ function buildRouterTree(pages: typeof sysPages.$inferSelect[]) {
         keepAlive: page.keepAlive === 1,
         hiddenTag: page.hiddenTag === 1,
         fixedTag: page.fixedTag === 1,
-        auths: page.auths ? page.auths.split(',').filter(Boolean) : undefined,
+        auths: page.auths ? page.auths.split(",").filter(Boolean) : undefined,
       },
       ...(children.length > 0 ? { children } : {}),
     };
@@ -236,12 +242,12 @@ export async function createMenu(params: Record<string, any>) {
 export async function updateMenu(params: Record<string, any>) {
   const db = await getDb();
   const [existing] = await db
-    .select({ id: sysPages.id })
+    .select({ id: sysPages.id, status: sysPages.status })
     .from(sysPages)
     .where(eq(sysPages.id, params.id))
     .limit(1);
   if (!existing) {
-    throw { code: 10003, message: '菜单不存在', status: 404 };
+    throw { code: 10003, message: "菜单不存在", status: 404 };
   }
 
   if (params.parentId !== undefined) {
@@ -249,8 +255,39 @@ export async function updateMenu(params: Record<string, any>) {
   }
   await assertUniqueRouteFields(db, params, params.id);
 
+  if (params.status === 0 && existing.status !== 0) {
+    const allPages = await db
+      .select({ id: sysPages.id, parentId: sysPages.parentId })
+      .from(sysPages);
+    await assertRoleHomePagesNotInUse(
+      db,
+      collectDescendantIds(allPages, params.id),
+    );
+  }
+
   const updateData: Record<string, any> = {};
-  const fields = ['parentId', 'menuType', 'title', 'name', 'path', 'component', 'rank', 'redirect', 'icon', 'extraIcon', 'enterTransition', 'leaveTransition', 'activePath', 'auths', 'keepAlive', 'hiddenTag', 'fixedTag', 'showLink', 'showParent', 'status'];
+  const fields = [
+    "parentId",
+    "menuType",
+    "title",
+    "name",
+    "path",
+    "component",
+    "rank",
+    "redirect",
+    "icon",
+    "extraIcon",
+    "enterTransition",
+    "leaveTransition",
+    "activePath",
+    "auths",
+    "keepAlive",
+    "hiddenTag",
+    "fixedTag",
+    "showLink",
+    "showParent",
+    "status",
+  ];
   for (const f of fields) {
     if (params[f] !== undefined) updateData[f] = params[f];
   }
@@ -261,41 +298,96 @@ export async function updateMenu(params: Record<string, any>) {
 
 export async function deleteMenu(id: number) {
   const db = await getDb();
-  const allPages = await db.select({ id: sysPages.id, parentId: sysPages.parentId }).from(sysPages);
+  const allPages = await db
+    .select({ id: sysPages.id, parentId: sysPages.parentId })
+    .from(sysPages);
   const ids = collectDescendantIds(allPages, id);
   if (ids.length === 0) {
-    throw { code: 10003, message: '菜单不存在', status: 404 };
+    throw { code: 10003, message: "菜单不存在", status: 404 };
   }
 
-  await db.delete(sysRolePages).where(inArray(sysRolePages.pageId, ids));
-  await db.delete(sysPages).where(inArray(sysPages.id, ids));
+  await db.transaction(async (tx) => {
+    await assertRoleHomePagesNotInUse(tx, ids);
+    await tx.delete(sysRolePages).where(inArray(sysRolePages.pageId, ids));
+    await tx.delete(sysPages).where(inArray(sysPages.id, ids));
+  });
 }
 
-async function assertValidParent(db: any, parentId: number, currentId?: number) {
+async function assertRoleHomePagesNotInUse(db: any, pageIds: number[]) {
+  if (pageIds.length === 0) return;
+
+  const assignments = await db
+    .select({
+      roleId: sysRoles.id,
+      roleName: sysRoles.name,
+      pageId: sysPages.id,
+      pageTitle: sysPages.title,
+    })
+    .from(sysRoles)
+    .innerJoin(sysPages, eq(sysRoles.homePageId, sysPages.id))
+    .where(inArray(sysRoles.homePageId, pageIds));
+
+  if (assignments.length === 0) return;
+
+  const visibleAssignments = assignments
+    .slice(0, 5)
+    .map((item) => `“${item.pageTitle}”（角色：${item.roleName}）`)
+    .join("、");
+  const hiddenCount = assignments.length - 5;
+  const suffix = hiddenCount > 0 ? `等 ${assignments.length} 项` : "";
+
+  throw {
+    code: 10001,
+    message: `${visibleAssignments}${suffix}已被设置为角色首页，请先在角色权限中取消首页设置`,
+    status: 400,
+    data: {
+      reason: "ROLE_HOME_PAGE_IN_USE",
+      assignments,
+    },
+  };
+}
+
+async function assertValidParent(
+  db: any,
+  parentId: number,
+  currentId?: number,
+) {
   if (!parentId) return;
   if (currentId && parentId === currentId) {
-    throw { code: 10001, message: '上级菜单不能选择自身', status: 400 };
+    throw { code: 10001, message: "上级菜单不能选择自身", status: 400 };
   }
 
   const allPages = await db
-    .select({ id: sysPages.id, parentId: sysPages.parentId, menuType: sysPages.menuType })
+    .select({
+      id: sysPages.id,
+      parentId: sysPages.parentId,
+      menuType: sysPages.menuType,
+    })
     .from(sysPages);
-  const parent = allPages.find(p => p.id === parentId);
+  const parent = allPages.find((p) => p.id === parentId);
   if (!parent) {
-    throw { code: 10003, message: '上级菜单不存在', status: 404 };
+    throw { code: 10003, message: "上级菜单不存在", status: 404 };
   }
   if (parent.menuType === 1) {
-    throw { code: 10001, message: '按钮不能作为上级菜单', status: 400 };
+    throw { code: 10001, message: "按钮不能作为上级菜单", status: 400 };
   }
   if (currentId) {
     const descendantIds = collectDescendantIds(allPages, currentId);
     if (descendantIds.includes(parentId)) {
-      throw { code: 10001, message: '上级菜单不能选择自身或下级菜单', status: 400 };
+      throw {
+        code: 10001,
+        message: "上级菜单不能选择自身或下级菜单",
+        status: 400,
+      };
     }
   }
 }
 
-async function assertUniqueRouteFields(db: any, params: Record<string, any>, currentId?: number) {
+async function assertUniqueRouteFields(
+  db: any,
+  params: Record<string, any>,
+  currentId?: number,
+) {
   if (params.menuType === 1) return;
   if (params.name) {
     const rows = await db
@@ -304,7 +396,7 @@ async function assertUniqueRouteFields(db: any, params: Record<string, any>, cur
       .where(eq(sysPages.name, params.name))
       .limit(1);
     if (rows[0] && rows[0].id !== currentId) {
-      throw { code: 10001, message: '路由名称已存在', status: 400 };
+      throw { code: 10001, message: "路由名称已存在", status: 400 };
     }
   }
   if (params.path) {
@@ -314,14 +406,17 @@ async function assertUniqueRouteFields(db: any, params: Record<string, any>, cur
       .where(eq(sysPages.path, params.path))
       .limit(1);
     if (rows[0] && rows[0].id !== currentId) {
-      throw { code: 10001, message: '路由路径已存在', status: 400 };
+      throw { code: 10001, message: "路由路径已存在", status: 400 };
     }
   }
 }
 
-function collectDescendantIds(rows: { id: number; parentId: number | null }[], rootId: number) {
+function collectDescendantIds(
+  rows: { id: number; parentId: number | null }[],
+  rootId: number,
+) {
   const childrenMap = new Map<number, number[]>();
-  const existingIds = new Set(rows.map(row => row.id));
+  const existingIds = new Set(rows.map((row) => row.id));
   if (!existingIds.has(rootId)) return [];
 
   for (const row of rows) {

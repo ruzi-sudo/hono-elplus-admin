@@ -21,6 +21,15 @@ type ResultTable = {
   };
 };
 
+type RolePermissionResult = {
+  code: number;
+  message: string;
+  data?: {
+    menuIds: number[];
+    homePageId: number | null;
+  };
+};
+
 /** 获取系统管理-用户管理列表 */
 export const getUserList = (data?: object) => {
   return http.request<ResultTable>("post", "/api/user", { data });
@@ -130,7 +139,9 @@ export const getSystemLogsDetail = (data?: object) => {
 
 /** 强退在线用户 */
 export const forceOffline = (data?: object) => {
-  return http.request<Result>("post", "/api/online-logs/force-offline", { data });
+  return http.request<Result>("post", "/api/online-logs/force-offline", {
+    data,
+  });
 };
 
 /** 删除系统日志 */
@@ -160,5 +171,7 @@ export const getRoleMenu = (data?: object) => {
 
 /** 获取角色管理-权限-菜单权限-根据角色 id 查对应菜单 */
 export const getRoleMenuIds = (data?: object) => {
-  return http.request<Result>("post", "/api/role-menu-ids", { data });
+  return http.request<RolePermissionResult>("post", "/api/role-menu-ids", {
+    data,
+  });
 };

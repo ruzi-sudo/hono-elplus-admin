@@ -336,7 +336,9 @@ function addAsyncRoutes(arrRoutes: Array<RouteRecordRaw>) {
       if (index !== -1) {
         v.component = modulesRoutes[modulesRoutesKeys[index]];
       } else {
-        console.warn(`[addAsyncRoutes] Component not found for path: ${v.path}, component: ${componentPath}`);
+        console.warn(
+          `[addAsyncRoutes] Component not found for path: ${v.path}, component: ${componentPath}`,
+        );
         if (v?.children && v.children.length) {
           v.component = ParentLayout;
         }
@@ -407,11 +409,19 @@ function handleTopMenu(route) {
 function getTopMenu(tag = false): menuType {
   const firstMenu = usePermissionStoreHook().wholeMenus?.[0];
   if (!firstMenu) return null as any;
-  const topMenu = handleTopMenu(
-    firstMenu.children?.[0] || firstMenu,
-  );
+  const topMenu = handleTopMenu(firstMenu.children?.[0] || firstMenu);
   tag && topMenu && useMultiTagsStoreHook().handleTags("push", topMenu);
   return topMenu;
+}
+
+/** 获取角色配置的首页，不可访问时回退到首个菜单 */
+function getRoleHomeMenu(homePath?: string, tag = false): menuType {
+  const homeMenu = homePath
+    ? findRouteByPath(homePath, usePermissionStoreHook().wholeMenus)
+    : null;
+  if (!homeMenu) return getTopMenu(tag);
+  tag && useMultiTagsStoreHook().handleTags("push", homeMenu);
+  return homeMenu as menuType;
 }
 
 export {
@@ -421,6 +431,7 @@ export {
   filterTree,
   initRouter,
   getTopMenu,
+  getRoleHomeMenu,
   addPathMatch,
   isOneOfArray,
   getHistoryMode,

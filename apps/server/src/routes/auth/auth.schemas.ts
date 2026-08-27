@@ -1,19 +1,22 @@
-import { z } from '@hono/zod-openapi';
+import { z } from "@hono/zod-openapi";
 
 export const LoginBodySchema = z.object({
-  username: z.string().min(1).openapi({ example: 'admin' }),
-  password: z.string().min(1).openapi({ example: 'admin123' }),
+  username: z.string().min(1).openapi({ example: "admin" }),
+  password: z.string().min(1).openapi({ example: "admin123" }),
 });
 
 export const RegisterBodySchema = z.object({
-  username: z.string().min(1).openapi({ example: 'new_user' }),
-  email: z.string().email().openapi({ example: 'user@example.com' }),
-  password: z.string().min(1).openapi({ example: 'Admin123' }),
-  confirmPassword: z.string().min(1).openapi({ example: 'Admin123' }),
+  username: z.string().min(1).openapi({ example: "new_user" }),
+  email: z.string().email().openapi({ example: "user@example.com" }),
+  password: z.string().min(1).openapi({ example: "Admin123" }),
+  confirmPassword: z.string().min(1).openapi({ example: "Admin123" }),
 });
 
 export const RefreshBodySchema = z.object({
-  refreshToken: z.string().min(1).openapi({ example: 'eyJhbGciOiJIUzUxMiJ9.adminRefresh' }),
+  refreshToken: z
+    .string()
+    .min(1)
+    .openapi({ example: "eyJhbGciOiJIUzUxMiJ9.adminRefresh" }),
 });
 
 export const LoginResponseSchema = z.object({
@@ -24,6 +27,7 @@ export const LoginResponseSchema = z.object({
     username: z.string(),
     roles: z.array(z.string()),
     permissions: z.array(z.string()),
+    homePath: z.string(),
     accessToken: z.string(),
     refreshToken: z.string(),
     expires: z.string(),
