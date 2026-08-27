@@ -51,6 +51,8 @@ export type UserInfo = {
   roleIds: number[];
   /** 当前登录用户的角色 */
   roles: string[];
+  /** 当前登录用户的角色名称 */
+  roleNames: string[];
   /** 备注 */
   remark: string;
   /** 简介 */
@@ -94,6 +96,24 @@ export const logoutApi = () => {
 /** 账户设置-个人信息 */
 export const getMine = (data?: object) => {
   return http.request<UserInfoResult>("get", "/api/mine", { data });
+};
+
+/** 更新当前登录用户的个人信息 */
+export const updateMine = (data?: object) => {
+  return http.request<Result>("post", "/api/mine/update", { data });
+};
+
+/** 更新当前登录用户的密码 */
+export const resetMinePassword = (data?: object) => {
+  return http.request<Result>("post", "/api/mine/reset-password", { data });
+};
+
+/** 上传当前登录用户的头像 */
+export const uploadMineAvatar = (data: FormData) => {
+  return http.request<Result>("post", "/api/mine/upload/avatar", {
+    data,
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 };
 
 /** 上传头像 */

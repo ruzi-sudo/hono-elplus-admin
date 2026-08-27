@@ -1,7 +1,11 @@
 import bcrypt from "bcryptjs";
-import { eq, and, ne, isNotNull, sql, count, desc, asc } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { eq, and, ne, isNotNull, sql, asc } from "drizzle-orm";
+import { getAuth, getAuthEmail } from "../auth";
 import { getDb } from "../db";
 import {
+  authAccounts,
+  authUsers,
   sysUsers,
   sysRoles,
   sysUserRoles,
@@ -10,12 +14,100 @@ import {
   sysOnlineUsers,
   sysLoginLogs,
 } from "../db/schema";
-import { signToken, signRefreshToken } from "../middlewares/auth";
 import {
+  ACCESS_TOKEN_TTL_SECONDS,
   getUserCredentialByRefreshToken,
   replaceUserCredential,
   storeUserCredential,
 } from "./redis.service";
+
+function formatExpires(expiresAt: Date): string {
+  return expiresAt.toISOString().replace("T", " ").slice(0, 19);
+}
+
+async function issueBetterAuthSession(
+  user: {
+    id: number;
+    username: string;
+    password: string;
+    avatar: string | null;
+  },
+  password: string,
+): Promise<string> {
+  const db = await getDb();
+  const auth = await getAuth();
+  const email = getAuthEmail(user.id);
+  const [linkedUser] = await db
+    .select({ id: authUsers.id })
+    .from(authUsers)
+    .where(eq(authUsers.legacyUserId, user.id))
+    .limit(1);
+
+  if (!linkedUser) {
+    const signedUp = await auth.api.signUpEmail({
+      body: {
+        name: user.username,
+        email,
+        password,
+        image: user.avatar || undefined,
+        legacyUserId: user.id,
+      },
+    });
+    if (!signedUp.token) {
+      throw { code: 10002, message: "Better Auth 会话创建失败", status: 500 };
+    }
+    return signedUp.token;
+  }
+
+  const now = new Date();
+  await db
+    .update(authUsers)
+    .set({
+      name: user.username,
+      email,
+      image: user.avatar,
+      updatedAt: now,
+    } as Partial<typeof authUsers.$inferInsert>)
+    .where(eq(authUsers.id, linkedUser.id));
+
+  const [credentialAccount] = await db
+    .select({ id: authAccounts.id })
+    .from(authAccounts)
+    .where(
+      and(
+        eq(authAccounts.userId, linkedUser.id),
+        eq(authAccounts.providerId, "credential"),
+      ),
+    )
+    .limit(1);
+
+  if (credentialAccount) {
+    await db
+      .update(authAccounts)
+      .set({ password: user.password, updatedAt: now } as Partial<
+        typeof authAccounts.$inferInsert
+      >)
+      .where(eq(authAccounts.id, credentialAccount.id));
+  } else {
+    await db.insert(authAccounts).values({
+      id: randomUUID(),
+      accountId: linkedUser.id,
+      providerId: "credential",
+      userId: linkedUser.id,
+      password: user.password,
+      createdAt: now,
+      updatedAt: now,
+    } as typeof authAccounts.$inferInsert);
+  }
+
+  const signedIn = await auth.api.signInEmail({
+    body: { email, password, rememberMe: true },
+  });
+  if (!signedIn.token) {
+    throw { code: 10002, message: "Better Auth 会话创建失败", status: 500 };
+  }
+  return signedIn.token;
+}
 
 export async function login(
   username: string,
@@ -109,16 +201,8 @@ export async function login(
 
   const permList = perms.map((p) => p.auths!).filter(Boolean);
 
-  const payload = {
-    userId: user.id,
-    username: user.username,
-    roles: roleCodes,
-  };
-  const accessToken = signToken(payload);
-  const refreshToken = signRefreshToken({
-    userId: user.id,
-    username: user.username,
-  });
+  const accessToken = await issueBetterAuthSession(user, password);
+  const refreshToken = accessToken;
   let credentialStored = false;
   let onlineUserId: number | null = null;
 
@@ -223,10 +307,9 @@ export async function login(
     homePath: homePage?.path || "",
     accessToken,
     refreshToken,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 19),
+    expires: formatExpires(
+      new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
+    ),
   };
 }
 
@@ -277,45 +360,36 @@ export async function refreshToken(token: string) {
     throw { code: 10001, message: "请求参数缺失或格式不正确", status: 400 };
   }
 
-  const jwt = await import("jsonwebtoken");
-  const JWT_SECRET = process.env.JWT_SECRET || "pureadmin-jwt-secret-key";
-  const decoded = jwt.default.verify(token, JWT_SECRET) as {
-    userId: number;
-    username: string;
-  };
   const oldCredential = await getUserCredentialByRefreshToken(token);
   if (!oldCredential) {
     throw { code: 10001, message: "登录状态已过期，请重新登录", status: 401 };
   }
 
-  const payload = {
-    userId: decoded.userId,
-    username: decoded.username,
-    roles: [] as string[],
-  };
-  const accessToken = signToken(payload);
-  const newRefreshToken = signRefreshToken({
-    userId: decoded.userId,
-    username: decoded.username,
+  const auth = await getAuth();
+  const session = await auth.api.getSession({
+    headers: new Headers({ Authorization: `Bearer ${token}` }),
   });
+  if (!session || Number(session.user.legacyUserId) !== oldCredential.userId) {
+    throw { code: 10002, message: "登录状态已过期，请重新登录", status: 401 };
+  }
+
   const replaced = await replaceUserCredential(oldCredential, {
-    userId: decoded.userId,
-    username: decoded.username,
+    userId: oldCredential.userId,
+    username: oldCredential.username,
     onlineUserId: oldCredential.onlineUserId,
-    accessToken,
-    refreshToken: newRefreshToken,
+    accessToken: token,
+    refreshToken: token,
   });
   if (!replaced) {
     throw { code: 10002, message: "登录凭证刷新失败，请重新登录", status: 500 };
   }
 
   return {
-    accessToken,
-    refreshToken: newRefreshToken,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 19),
+    accessToken: token,
+    refreshToken: token,
+    expires: formatExpires(
+      new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
+    ),
   };
 }
 

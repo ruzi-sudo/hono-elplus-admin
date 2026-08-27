@@ -79,13 +79,15 @@ const {
 
     <PureTableBar title="系统日志" :columns="columns" @refresh="onSearch">
       <template #buttons>
-        <el-popconfirm title="确定要删除所有日志数据吗？" @confirm="clearAll">
-          <template #reference>
-            <el-button type="danger" :icon="useRenderIcon(Delete)">
-              清空日志
-            </el-button>
-          </template>
-        </el-popconfirm>
+        <Auth value="system-log:clear">
+          <el-popconfirm title="确定要删除所有日志数据吗？" @confirm="clearAll">
+            <template #reference>
+              <el-button type="danger" :icon="useRenderIcon(Delete)">
+                清空日志
+              </el-button>
+            </template>
+          </el-popconfirm>
+        </Auth>
       </template>
       <template v-slot="{ size, dynamicColumns }">
         <div
@@ -104,11 +106,15 @@ const {
               取消选择
             </el-button>
           </div>
-          <el-popconfirm title="是否确认删除?" @confirm="onbatchDel">
-            <template #reference>
-              <el-button type="danger" text class="mr-1!"> 批量删除 </el-button>
-            </template>
-          </el-popconfirm>
+          <Auth value="system-log:batch-delete">
+            <el-popconfirm title="是否确认删除?" @confirm="onbatchDel">
+              <template #reference>
+                <el-button type="danger" text class="mr-1!">
+                  批量删除
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </Auth>
         </div>
         <pure-table
           ref="tableRef"
@@ -132,16 +138,18 @@ const {
           @cell-dblclick="handleCellDblclick"
         >
           <template #operation="{ row }">
-            <el-button
-              class="reset-margin outline-hidden!"
-              link
-              type="primary"
-              :size="size"
-              :icon="useRenderIcon(View)"
-              @click="onDetail(row)"
-            >
-              详情
-            </el-button>
+            <Auth value="system-log:view">
+              <el-button
+                class="reset-margin outline-hidden!"
+                link
+                type="primary"
+                :size="size"
+                :icon="useRenderIcon(View)"
+                @click="onDetail(row)"
+              >
+                详情
+              </el-button>
+            </Auth>
           </template>
         </pure-table>
       </template>

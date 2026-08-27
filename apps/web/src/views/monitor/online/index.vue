@@ -78,22 +78,24 @@ const {
           @page-current-change="handleCurrentChange"
         >
           <template #operation="{ row }">
-            <el-popconfirm
-              :title="`是否强制下线${row.username}`"
-              @confirm="handleOffline(row)"
-            >
-              <template #reference>
-                <el-button
-                  class="reset-margin"
-                  link
-                  type="primary"
-                  :size="size"
-                  :icon="useRenderIcon(Plane)"
-                >
-                  强退
-                </el-button>
-              </template>
-            </el-popconfirm>
+            <Auth value="online-user:force-logout">
+              <el-popconfirm
+                :title="`是否强制下线${row.username}`"
+                @confirm="handleOffline(row)"
+              >
+                <template #reference>
+                  <el-button
+                    class="reset-margin"
+                    link
+                    type="primary"
+                    :size="size"
+                    :icon="useRenderIcon(Plane)"
+                  >
+                    强退
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </Auth>
           </template>
         </pure-table>
       </template>

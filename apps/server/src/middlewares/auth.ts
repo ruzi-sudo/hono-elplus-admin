@@ -1,45 +1,88 @@
-import type { Context, Next } from 'hono';
-import jwt from 'jsonwebtoken';
-import { UnauthorizedException } from '../common/exception';
-import { isAccessTokenOnline } from '../service/redis.service';
+import type { Context, Next } from "hono";
+import { and, asc, eq } from "drizzle-orm";
+import { getAuth } from "../auth";
+import { UnauthorizedException } from "../common/exception";
+import { getDb } from "../db";
+import { sysRoles, sysUserRoles, sysUsers } from "../db/schema";
+import { isAccessTokenOnline } from "../service/redis.service";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'pureadmin-jwt-secret-key';
-
-export interface JwtPayload {
+export interface AuthenticatedUser {
   userId: number;
   username: string;
   roles: string[];
+  authUserId: string;
+  sessionId: string;
 }
 
-export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-}
-
-export function signRefreshToken(payload: Pick<JwtPayload, 'userId' | 'username'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-}
-
-export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+export function getAuthenticatedUser(c: Context): AuthenticatedUser {
+  const user = c.get("user") as AuthenticatedUser | undefined;
+  if (!user) throw new UnauthorizedException();
+  return user;
 }
 
 export async function authMiddleware(c: Context, next: Next) {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new UnauthorizedException('未登录或登录状态已过期');
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new UnauthorizedException();
   }
 
-  const token = authHeader.slice(7);
-  try {
-    const payload = verifyToken(token);
-    const online = await isAccessTokenOnline(token);
-    if (!online) {
-      throw new UnauthorizedException('登录状态已过期，请重新登录');
-    }
-    c.set('user', payload);
-    await next();
-  } catch (err) {
-    if (err instanceof UnauthorizedException) throw err;
-    throw new UnauthorizedException('登录状态已过期，请重新登录');
+  const token = authHeader.slice(7).trim();
+  if (!token || !(await isAccessTokenOnline(token))) {
+    throw new UnauthorizedException("登录状态已过期，请重新登录");
   }
+
+  try {
+    const auth = await getAuth();
+    const authSession = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!authSession) {
+      throw new UnauthorizedException("登录状态已过期，请重新登录");
+    }
+
+    const legacyUserId = Number(authSession.user.legacyUserId);
+    if (!Number.isSafeInteger(legacyUserId) || legacyUserId <= 0) {
+      throw new UnauthorizedException("登录账号未关联业务用户");
+    }
+
+    const db = await getDb();
+    const [businessUser] = await db
+      .select({
+        id: sysUsers.id,
+        username: sysUsers.username,
+        status: sysUsers.status,
+      })
+      .from(sysUsers)
+      .where(eq(sysUsers.id, legacyUserId))
+      .limit(1);
+
+    if (!businessUser || businessUser.status !== 1) {
+      throw new UnauthorizedException("账号不存在或已停用");
+    }
+
+    const roleRows = await db
+      .select({ code: sysRoles.code })
+      .from(sysRoles)
+      .innerJoin(sysUserRoles, eq(sysRoles.id, sysUserRoles.roleId))
+      .where(
+        and(eq(sysUserRoles.userId, businessUser.id), eq(sysRoles.status, 1)),
+      )
+      .orderBy(asc(sysRoles.id));
+
+    const user: AuthenticatedUser = {
+      userId: businessUser.id,
+      username: businessUser.username,
+      roles: roleRows.map((role) => role.code),
+      authUserId: authSession.user.id,
+      sessionId: authSession.session.id,
+    };
+
+    c.set("user", user);
+    c.set("authSession", authSession.session);
+  } catch (error) {
+    if (error instanceof UnauthorizedException) throw error;
+    throw new UnauthorizedException("登录状态已过期，请重新登录");
+  }
+
+  await next();
 }

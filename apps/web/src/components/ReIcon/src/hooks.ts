@@ -1,6 +1,7 @@
 import type { iconType } from "./types";
+import { normalizeOfflineIconName } from "./normalizeIconName";
 import { h, defineComponent, type Component } from "vue";
-import { FontIcon, IconifyIconOnline, IconifyIconOffline } from "../index";
+import { FontIcon, IconifyIconOffline } from "../index";
 
 const ifReg = /^IF-/;
 const svgReg = /^\s*<svg[\s>]/;
@@ -81,15 +82,13 @@ export function useRenderIcon(icon: any, attrs?: iconType): Component {
       },
     });
   } else {
-    // 优先走离线图标（已通过 addIcon 注册的），在线图标作为回退
-    // 路由中 meta.icon 为 "ep/home-filled" 这类 Iconify 名称时，优先匹配离线注册
+    // 离线图标统一以 `prefix/name` 注册，同时兼容接口返回的 `prefix:name`。
     return defineComponent({
       name: "Icon",
       render() {
         if (!icon) return;
-        // 不过滤冒号，统一先尝试离线，在线由 @iconify/vue 内部 fallback
         return h(IconifyIconOffline, {
-          icon,
+          icon: normalizeOfflineIconName(icon),
           ...attrs,
         });
       },

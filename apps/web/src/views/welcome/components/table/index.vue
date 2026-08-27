@@ -31,13 +31,15 @@ const { loading, columns, dataList, pagination, Empty, onCurrentChange } =
       </el-empty>
     </template>
     <template #operation="{ row }">
-      <el-button
-        plain
-        circle
-        size="small"
-        :title="`查看序号为${row.id}的详情`"
-        :icon="useRenderIcon('ri:search-line')"
-      />
+      <Auth value="welcome:view">
+        <el-button
+          plain
+          circle
+          size="small"
+          :title="`查看序号为${row.id}的详情`"
+          :icon="useRenderIcon('ri:search-line')"
+        />
+      </Auth>
     </template>
   </pure-table>
 </template>

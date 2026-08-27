@@ -82,6 +82,7 @@ onMounted(() => {
   useResizeObserver(contentRef, async () => {
     await nextTick();
     delay(60).then(() => {
+      if (!tableRef.value) return;
       treeHeight.value = parseFloat(
         subBefore(
           tableRef.value.getTableDoms().tableWrapper.style.height,
@@ -160,13 +161,15 @@ onMounted(() => {
         @refresh="onSearch"
       >
         <template #buttons>
-          <el-button
-            type="primary"
-            :icon="useRenderIcon(AddFill)"
-            @click="openDialog()"
-          >
-            新增角色
-          </el-button>
+          <Auth value="system-role:add">
+            <el-button
+              type="primary"
+              :icon="useRenderIcon(AddFill)"
+              @click="openDialog()"
+            >
+              新增角色
+            </el-button>
+          </Auth>
         </template>
         <template v-slot="{ size, dynamicColumns }">
           <pure-table
@@ -190,44 +193,50 @@ onMounted(() => {
             @page-current-change="handleCurrentChange"
           >
             <template #operation="{ row }">
-              <el-button
-                class="reset-margin"
-                link
-                type="primary"
-                :size="size"
-                :icon="useRenderIcon(EditPen)"
-                :disabled="row.code === 'admin' || row.code === 'common'"
-                @click="openDialog('修改', row)"
-              >
-                修改
-              </el-button>
-              <el-popconfirm
-                :title="`是否确认删除角色名称为${row.name}的这条数据`"
-                @confirm="handleDelete(row)"
-              >
-                <template #reference>
-                  <el-button
-                    class="reset-margin"
-                    link
-                    type="primary"
-                    :size="size"
-                    :disabled="row.code === 'admin' || row.code === 'common'"
-                    :icon="useRenderIcon(Delete)"
-                  >
-                    删除
-                  </el-button>
-                </template>
-              </el-popconfirm>
-              <el-button
-                class="reset-margin"
-                link
-                type="primary"
-                :size="size"
-                :icon="useRenderIcon(Menu)"
-                @click="handleMenu(row)"
-              >
-                权限
-              </el-button>
+              <Auth value="system-role:edit">
+                <el-button
+                  class="reset-margin"
+                  link
+                  type="primary"
+                  :size="size"
+                  :icon="useRenderIcon(EditPen)"
+                  :disabled="row.code === 'admin' || row.code === 'common'"
+                  @click="openDialog('修改', row)"
+                >
+                  修改
+                </el-button>
+              </Auth>
+              <Auth value="system-role:delete">
+                <el-popconfirm
+                  :title="`是否确认删除角色名称为${row.name}的这条数据`"
+                  @confirm="handleDelete(row)"
+                >
+                  <template #reference>
+                    <el-button
+                      class="reset-margin"
+                      link
+                      type="primary"
+                      :size="size"
+                      :disabled="row.code === 'admin' || row.code === 'common'"
+                      :icon="useRenderIcon(Delete)"
+                    >
+                      删除
+                    </el-button>
+                  </template>
+                </el-popconfirm>
+              </Auth>
+              <Auth value="system-role:configure-permission">
+                <el-button
+                  class="reset-margin"
+                  link
+                  type="primary"
+                  :size="size"
+                  :icon="useRenderIcon(Menu)"
+                  @click="handleMenu(row)"
+                >
+                  权限
+                </el-button>
+              </Auth>
               <!-- <el-dropdown>
               <el-button
                 class="ml-3 mt-[2px]"
@@ -288,18 +297,20 @@ onMounted(() => {
                 @click="handleMenu"
               />
             </span>
-            <span :class="[iconClass, 'ml-2']">
-              <IconifyIconOffline
-                v-tippy="{
-                  content: '保存权限配置',
-                }"
-                class="dark:text-white"
-                width="18px"
-                height="18px"
-                :icon="Check"
-                @click="handleSave"
-              />
-            </span>
+            <Auth value="system-role:save-permission">
+              <span :class="[iconClass, 'ml-2']">
+                <IconifyIconOffline
+                  v-tippy="{
+                    content: '保存权限配置',
+                  }"
+                  class="dark:text-white"
+                  width="18px"
+                  height="18px"
+                  :icon="Check"
+                  @click="handleSave"
+                />
+              </span>
+            </Auth>
           </div>
           <p class="font-bold truncate">
             权限配置

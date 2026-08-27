@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
-import { getDb } from '../db';
-import { sysRoles, sysUserRoles, sysUsers } from '../db/schema';
+import { eq } from "drizzle-orm";
+import { getDb } from "../db";
+import { sysRoles, sysUserRoles, sysUsers } from "../db/schema";
 
 export async function getMineInfo(userId: number) {
   const db = await getDb();
@@ -23,6 +23,7 @@ export async function getMineInfo(userId: number) {
     .select({
       id: sysRoles.id,
       code: sysRoles.code,
+      name: sysRoles.name,
     })
     .from(sysUserRoles)
     .innerJoin(sysRoles, eq(sysUserRoles.roleId, sysRoles.id))
@@ -30,13 +31,14 @@ export async function getMineInfo(userId: number) {
 
   return {
     id: user.id,
-    avatar: user.avatar || '',
+    avatar: user.avatar || "",
     username: user.username,
-    email: user.email || '',
+    email: user.email || "",
     status: user.status ?? 1,
-    remark: user.remark || '',
-    roleIds: roles.map(role => role.id),
-    roles: roles.map(role => role.code),
-    description: user.remark || '',
+    remark: user.remark || "",
+    roleIds: roles.map((role) => role.id),
+    roles: roles.map((role) => role.code),
+    roleNames: roles.map((role) => role.name),
+    description: user.remark || "",
   };
 }

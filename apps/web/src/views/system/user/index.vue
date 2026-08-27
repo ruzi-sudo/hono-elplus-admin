@@ -96,13 +96,15 @@ const {
 
       <PureTableBar title="用户管理" :columns="columns" @refresh="onSearch">
         <template #buttons>
-          <el-button
-            type="primary"
-            :icon="useRenderIcon(AddFill)"
-            @click="openDialog()"
-          >
-            新增用户
-          </el-button>
+          <Auth value="system-user:add">
+            <el-button
+              type="primary"
+              :icon="useRenderIcon(AddFill)"
+              @click="openDialog()"
+            >
+              新增用户
+            </el-button>
+          </Auth>
         </template>
         <template v-slot="{ size, dynamicColumns }">
           <div
@@ -121,13 +123,15 @@ const {
                 取消选择
               </el-button>
             </div>
-            <el-popconfirm title="是否确认删除?" @confirm="onbatchDel">
-              <template #reference>
-                <el-button type="danger" text class="mr-1!">
-                  批量删除
-                </el-button>
-              </template>
-            </el-popconfirm>
+            <Auth value="system-user:batch-delete">
+              <el-popconfirm title="是否确认删除?" @confirm="onbatchDel">
+                <template #reference>
+                  <el-button type="danger" text class="mr-1!">
+                    批量删除
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </Auth>
           </div>
           <pure-table
             ref="tableRef"
@@ -150,32 +154,36 @@ const {
             @page-current-change="handleCurrentChange"
           >
             <template #operation="{ row }">
-              <el-button
-                class="reset-margin"
-                link
-                type="primary"
-                :size="size"
-                :icon="useRenderIcon(EditPen)"
-                @click="openDialog('修改', row)"
-              >
-                修改
-              </el-button>
-              <el-popconfirm
-                :title="`是否确认删除用户编号为${row.id}的这条数据`"
-                @confirm="handleDelete(row)"
-              >
-                <template #reference>
-                  <el-button
-                    class="reset-margin"
-                    link
-                    type="primary"
-                    :size="size"
-                    :icon="useRenderIcon(Delete)"
-                  >
-                    删除
-                  </el-button>
-                </template>
-              </el-popconfirm>
+              <Auth value="system-user:edit">
+                <el-button
+                  class="reset-margin"
+                  link
+                  type="primary"
+                  :size="size"
+                  :icon="useRenderIcon(EditPen)"
+                  @click="openDialog('修改', row)"
+                >
+                  修改
+                </el-button>
+              </Auth>
+              <Auth value="system-user:delete">
+                <el-popconfirm
+                  :title="`是否确认删除用户编号为${row.id}的这条数据`"
+                  @confirm="handleDelete(row)"
+                >
+                  <template #reference>
+                    <el-button
+                      class="reset-margin"
+                      link
+                      type="primary"
+                      :size="size"
+                      :icon="useRenderIcon(Delete)"
+                    >
+                      删除
+                    </el-button>
+                  </template>
+                </el-popconfirm>
+              </Auth>
               <el-dropdown>
                 <el-button
                   class="ml-3! mt-0.5!"
@@ -186,30 +194,34 @@ const {
                 />
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item>
-                      <el-button
-                        :class="buttonClass"
-                        link
-                        type="primary"
-                        :size="size"
-                        :icon="useRenderIcon(Upload)"
-                        @click="handleUpload(row)"
-                      >
-                        上传头像
-                      </el-button>
-                    </el-dropdown-item>
-                    <el-dropdown-item>
-                      <el-button
-                        :class="buttonClass"
-                        link
-                        type="primary"
-                        :size="size"
-                        :icon="useRenderIcon(Password)"
-                        @click="handleReset(row)"
-                      >
-                        重置密码
-                      </el-button>
-                    </el-dropdown-item>
+                    <Auth value="system-user:upload-avatar">
+                      <el-dropdown-item>
+                        <el-button
+                          :class="buttonClass"
+                          link
+                          type="primary"
+                          :size="size"
+                          :icon="useRenderIcon(Upload)"
+                          @click="handleUpload(row)"
+                        >
+                          上传头像
+                        </el-button>
+                      </el-dropdown-item>
+                    </Auth>
+                    <Auth value="system-user:reset-password">
+                      <el-dropdown-item>
+                        <el-button
+                          :class="buttonClass"
+                          link
+                          type="primary"
+                          :size="size"
+                          :icon="useRenderIcon(Password)"
+                          @click="handleReset(row)"
+                        >
+                          重置密码
+                        </el-button>
+                      </el-dropdown-item>
+                    </Auth>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>

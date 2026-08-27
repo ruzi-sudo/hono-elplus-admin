@@ -1,6 +1,6 @@
 -- ============================================================
 -- PureAdmin Initial Database Schema
--- All tables use `sys_` prefix
+-- Business tables use `sys_`; Better Auth tables use `auth_`
 -- ============================================================
 
 USE hono_elplus_admin;
@@ -31,6 +31,69 @@ CREATE TABLE IF NOT EXISTS sys_users (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+
+-- ----------------------------
+-- 2A. Better Auth 用户表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS auth_users (
+    id              VARCHAR(64) PRIMARY KEY,
+    name            VARCHAR(128) NOT NULL,
+    email           VARCHAR(255) NOT NULL,
+    email_verified  BOOLEAN NOT NULL DEFAULT FALSE,
+    image           VARCHAR(512),
+    legacy_user_id  INT NOT NULL,
+    created_at      DATETIME NOT NULL,
+    updated_at      DATETIME NOT NULL,
+    UNIQUE KEY uk_auth_users_email (email),
+    UNIQUE KEY uk_auth_users_legacy_user_id (legacy_user_id),
+    CONSTRAINT fk_auth_users_legacy_user
+      FOREIGN KEY (legacy_user_id) REFERENCES sys_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Better Auth 用户表';
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id          VARCHAR(64) PRIMARY KEY,
+    expires_at  DATETIME NOT NULL,
+    token       VARCHAR(255) NOT NULL,
+    created_at  DATETIME NOT NULL,
+    updated_at  DATETIME NOT NULL,
+    ip_address  VARCHAR(64),
+    user_agent  TEXT,
+    user_id     VARCHAR(64) NOT NULL,
+    UNIQUE KEY uk_auth_sessions_token (token),
+    KEY idx_auth_sessions_user_id (user_id),
+    CONSTRAINT fk_auth_sessions_user
+      FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Better Auth 会话表';
+
+CREATE TABLE IF NOT EXISTS auth_accounts (
+    id                       VARCHAR(64) PRIMARY KEY,
+    account_id               VARCHAR(255) NOT NULL,
+    provider_id              VARCHAR(64) NOT NULL,
+    user_id                  VARCHAR(64) NOT NULL,
+    access_token             TEXT,
+    refresh_token            TEXT,
+    id_token                 TEXT,
+    access_token_expires_at  DATETIME,
+    refresh_token_expires_at DATETIME,
+    scope                    TEXT,
+    password                 VARCHAR(255),
+    created_at               DATETIME NOT NULL,
+    updated_at               DATETIME NOT NULL,
+    UNIQUE KEY uk_auth_accounts_provider_account (provider_id, account_id),
+    KEY idx_auth_accounts_user_id (user_id),
+    CONSTRAINT fk_auth_accounts_user
+      FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Better Auth 账号表';
+
+CREATE TABLE IF NOT EXISTS auth_verifications (
+    id          VARCHAR(64) PRIMARY KEY,
+    identifier  VARCHAR(255) NOT NULL,
+    value       TEXT NOT NULL,
+    expires_at  DATETIME NOT NULL,
+    created_at  DATETIME NOT NULL,
+    updated_at  DATETIME NOT NULL,
+    KEY idx_auth_verifications_identifier (identifier)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Better Auth 验证表';
 
 -- ----------------------------
 -- 3. 角色表
@@ -218,6 +281,30 @@ INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, name, path, compo
 (10, 9, 0, 'menus.pureOnlineUser', 'OnlineUser', '/monitor/online-user', 'views/monitor/online/index.vue', 1, 'ri/user-voice-line', NULL, 1),
 (11, 9, 0, 'menus.pureLoginLog', 'LoginLog', '/monitor/login-logs', 'views/monitor/logs/login/index.vue', 2, 'ri/window-line', NULL, 1),
 (13, 9, 0, 'menus.pureSystemLog', 'SystemLog', '/monitor/system-logs', 'views/monitor/logs/system/index.vue', 4, 'ri/file-search-line', NULL, 1);
+
+INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, `rank`, auths, status) VALUES
+(100, 2, 1, '查看详情', 1, 'welcome:view', 1),
+(101, 6, 1, '新增用户', 1, 'system-user:add', 1),
+(102, 6, 1, '批量删除', 2, 'system-user:batch-delete', 1),
+(103, 6, 1, '修改', 3, 'system-user:edit', 1),
+(104, 6, 1, '删除', 4, 'system-user:delete', 1),
+(105, 6, 1, '上传头像', 5, 'system-user:upload-avatar', 1),
+(106, 6, 1, '重置密码', 6, 'system-user:reset-password', 1),
+(107, 7, 1, '新增角色', 1, 'system-role:add', 1),
+(108, 7, 1, '修改', 2, 'system-role:edit', 1),
+(109, 7, 1, '删除', 3, 'system-role:delete', 1),
+(110, 7, 1, '权限', 4, 'system-role:configure-permission', 1),
+(111, 7, 1, '保存权限配置', 5, 'system-role:save-permission', 1),
+(112, 8, 1, '新增菜单', 1, 'system-menu:add', 1),
+(113, 8, 1, '修改', 2, 'system-menu:edit', 1),
+(114, 8, 1, '新增子菜单', 3, 'system-menu:add-child', 1),
+(115, 8, 1, '删除', 4, 'system-menu:delete', 1),
+(116, 11, 1, '清空日志', 1, 'login-log:clear', 1),
+(117, 11, 1, '批量删除', 2, 'login-log:batch-delete', 1),
+(118, 13, 1, '清空日志', 1, 'system-log:clear', 1),
+(119, 13, 1, '批量删除', 2, 'system-log:batch-delete', 1),
+(120, 13, 1, '详情', 3, 'system-log:view', 1),
+(121, 10, 1, '强退', 1, 'online-user:force-logout', 1);
 
 INSERT IGNORE INTO sys_role_pages (role_id, page_id)
 SELECT 1, id FROM sys_pages;

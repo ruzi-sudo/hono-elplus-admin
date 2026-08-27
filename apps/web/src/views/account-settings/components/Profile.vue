@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { message } from "@/utils/message";
 import { onMounted, reactive, ref } from "vue";
-import { type UserInfo, getMine, uploadAvatar } from "@/api/user";
 import {
-  getAllRoleList,
-  resetPassword,
-  updateUser,
-} from "@/api/system";
+  type UserInfo,
+  getMine,
+  resetMinePassword,
+  updateMine,
+  uploadMineAvatar,
+} from "@/api/user";
 import type { FormInstance, FormRules } from "element-plus";
 import ReCropperPreview from "@/components/ReCropperPreview";
 import { createFormData, deviceDetection } from "@pureadmin/utils";
@@ -24,7 +25,6 @@ const isShow = ref(false);
 const passwordDialogVisible = ref(false);
 const userInfoFormRef = ref<FormInstance>();
 const passwordFormRef = ref<FormInstance>();
-const roleOptions = ref<{ id: number; name: string }[]>([]);
 
 const userInfos = reactive({
   id: null as number | null,
@@ -32,6 +32,8 @@ const userInfos = reactive({
   username: "",
   email: "",
   roleIds: [] as number[],
+  roles: [] as string[],
+  roleNames: [] as string[],
   status: 1,
   remark: "",
   description: "",
@@ -48,7 +50,6 @@ const rules = reactive<FormRules<UserInfo & { id: number | null }>>({
     { required: true, message: "邮箱必填", trigger: "blur" },
     { type: "email", message: "邮箱格式不正确", trigger: ["blur", "change"] },
   ],
-  roleIds: [{ required: true, message: "请选择角色", trigger: "change" }],
 });
 
 const passwordRules = reactive<FormRules>({
@@ -94,13 +95,13 @@ const handleSubmitImage = async () => {
     file: new File([cropperBlob.value], "avatar.png", { type: "image/png" }),
   });
   try {
-    const { code, data, message: msg } = await uploadAvatar(formData);
+    const { code, data, message: msg } = await uploadMineAvatar(formData);
     if (code !== 0) {
       message(msg || "上传头像失败", { type: "error" });
       return;
     }
     const avatar = data?.url;
-    const result = await updateUser({ id: userInfos.id, avatar });
+    const result = await updateMine({ avatar });
     if (result.code !== 0) {
       message(result.message || "更新头像失败", { type: "error" });
       return;
@@ -118,12 +119,9 @@ const onSubmit = async (formEl: FormInstance) => {
   if (!userInfos.id) return;
   await formEl.validate(async (valid) => {
     if (valid) {
-      const { code, message: msg } = await updateUser({
-        id: userInfos.id,
+      const { code, message: msg } = await updateMine({
         username: userInfos.username,
         email: userInfos.email,
-        roleIds: userInfos.roleIds,
-        status: userInfos.status,
         remark: userInfos.remark || userInfos.description,
       });
       if (code !== 0) {
@@ -145,8 +143,7 @@ const handleResetPassword = async () => {
   if (!userInfos.id || !passwordFormRef.value) return;
   await passwordFormRef.value.validate(async (valid) => {
     if (!valid) return;
-    const { code, message: msg } = await resetPassword({
-      id: userInfos.id,
+    const { code, message: msg } = await resetMinePassword({
       password: passwordForm.password,
     });
     if (code !== 0) {
@@ -159,11 +156,7 @@ const handleResetPassword = async () => {
 };
 
 onMounted(async () => {
-  const [{ code, data }, rolesResult] = await Promise.all([
-    getMine(),
-    getAllRoleList(),
-  ]);
-  roleOptions.value = rolesResult.data ?? [];
+  const { code, data } = await getMine();
   if (code === 0) {
     Object.assign(userInfos, data);
     userInfos.description = data.description || data.remark || "";
@@ -207,25 +200,15 @@ onMounted(async () => {
           clearable
         />
       </el-form-item>
-      <el-form-item label="角色" prop="roleIds">
-        <el-select
-          v-model="userInfos.roleIds"
-          placeholder="请选择角色"
-          class="w-full"
-          multiple
-          collapse-tags
-        >
-          <el-option
-            v-for="role in roleOptions"
-            :key="role.id"
-            :label="role.name"
-            :value="role.id"
-          />
-        </el-select>
+      <el-form-item label="角色">
+        <el-tag v-for="role in userInfos.roleNames" :key="role" class="mr-2!">
+          {{ role }}
+        </el-tag>
       </el-form-item>
       <el-form-item label="状态">
         <el-switch
           v-model="userInfos.status"
+          disabled
           inline-prompt
           :active-value="1"
           :inactive-value="0"
