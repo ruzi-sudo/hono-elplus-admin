@@ -1,33 +1,27 @@
-version: "3.8"
+name: hono-elplus-admin
 
 services:
-  mysql:
+  infra:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.db
+      dockerfile: docker/Dockerfile
       args:
         MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
-    container_name: pureadmin-db
+    container_name: hono-elplus-admin
     ports:
-      - "3306:3306"
+      - "3307:3306"
+      - "6380:6379"
     env_file:
-      - ../.env
+      - ../.env.dev
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-hono_elplus_admin}
     volumes:
-      - mysql_data:/var/lib/mysql
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: pureadmin-redis
-    command: redis-server --notify-keyspace-events Ex
-    env_file:
-      - ../.env
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - hono_elplus_admin_mysql_data:/var/lib/mysql
+      - hono_elplus_admin_redis_data:/data
     restart: unless-stopped
 
 volumes:
-  mysql_data:
-  redis_data:
+  hono_elplus_admin_mysql_data:
+    name: hono_elplus_admin_mysql_data
+  hono_elplus_admin_redis_data:
+    name: hono_elplus_admin_redis_data

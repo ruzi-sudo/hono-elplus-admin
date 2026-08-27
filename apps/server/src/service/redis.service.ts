@@ -67,7 +67,7 @@ function logRedisConnectionHint(err: unknown): void {
   hasLoggedConnectionHint = true;
   console.error(
     `[Redis] Unable to connect to ${REDIS_URL}: ${formatRedisError(err)}. ` +
-    'Start Redis with `docker compose -f docker/docker-compose.yml up -d redis` or set REDIS_URL.',
+    'Start Redis with `docker compose -f docker/docker-compose.yml up -d infra` or set REDIS_URL.',
   );
 }
 

@@ -11,11 +11,11 @@
                 "MYSQL_PORT": "3306",
                 "MYSQL_USER": "root",
                 "MYSQL_PASS": "root123",
-                "MYSQL_DB": "pureadmin",
+                "MYSQL_DB": "hono_elplus_admin",
                 "ALLOW_INSERT_OPERATION": "true",
                 "ALLOW_UPDATE_OPERATION": "true",
                 "ALLOW_DELETE_OPERATION": "true",
-                "SCHEMA_UPDATE_PERMISSIONS": "pureadmin"
+                "SCHEMA_UPDATE_PERMISSIONS": "hono_elplus_admin"
             }
         }
     }

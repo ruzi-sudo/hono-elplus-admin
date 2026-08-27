@@ -118,7 +118,7 @@ pnpm dev
 
 ## 环境配置
 
-项目使用根目录 `.env` 作为统一环境配置入口，后端会从该文件读取数据库、Redis、JWT 等配置。
+本地开发优先读取根目录 `.env.dev`，不存在时回退到 `.env`。后端会从该文件读取数据库、Redis、JWT 等配置；Shell 或容器显式传入的环境变量优先级更高。
 
 本地开发时需要确认 MySQL 和 Redis 配置与 `docker/docker-compose.yml` 保持一致。
 

@@ -3,7 +3,7 @@
 -- All tables use `sys_` prefix
 -- ============================================================
 
-USE pureadmin;
+USE hono_elplus_admin;
 
 -- ----------------------------
 -- 1. 系统配置表
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS sys_roles (
     code        VARCHAR(64) UNIQUE NOT NULL COMMENT '角色标识',
     status      TINYINT DEFAULT 1 COMMENT '状态(1启用 0停用)',
     remark      TEXT COMMENT '备注',
+    home_page_id INT COMMENT '角色登录首页页面ID',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
@@ -235,6 +236,7 @@ INSERT IGNORE INTO sys_login_logs (id, user_id, username, ip, address, `system`,
 CREATE INDEX idx_configs_key ON sys_configs(config_key);
 CREATE INDEX idx_users_username ON sys_users(username);
 CREATE INDEX idx_roles_code ON sys_roles(code);
+CREATE INDEX idx_roles_home_page_id ON sys_roles(home_page_id);
 CREATE INDEX idx_user_roles_user_id ON sys_user_roles(user_id);
 CREATE INDEX idx_user_roles_role_id ON sys_user_roles(role_id);
 CREATE INDEX idx_pages_parent_id ON sys_pages(parent_id);
