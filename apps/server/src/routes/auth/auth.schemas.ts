@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../../auth";
 
 export const LoginBodySchema = z.object({
   username: z.string().min(1).openapi({ example: "admin" }),
@@ -8,8 +9,16 @@ export const LoginBodySchema = z.object({
 export const RegisterBodySchema = z.object({
   username: z.string().min(1).openapi({ example: "new_user" }),
   email: z.string().email().openapi({ example: "user@example.com" }),
-  password: z.string().min(1).openapi({ example: "Admin123" }),
-  confirmPassword: z.string().min(1).openapi({ example: "Admin123" }),
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH)
+    .max(PASSWORD_MAX_LENGTH)
+    .openapi({ example: "Admin123" }),
+  confirmPassword: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH)
+    .max(PASSWORD_MAX_LENGTH)
+    .openapi({ example: "Admin123" }),
 });
 
 export const RefreshBodySchema = z.object({

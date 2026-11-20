@@ -1,5 +1,10 @@
-import { createRoute, z } from "@hono/zod-openapi";
-import { ErrorResponseSchema } from "../../common/schemas";
+import { createRoute } from "@hono/zod-openapi";
+import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
+import {
+  ResetMinePasswordSchema,
+  UpdateMineSchema,
+  UploadMineAvatarSchema,
+} from "./dashboard.schemas";
 
 export const getCardList = createRoute({
   method: "post",
@@ -11,6 +16,7 @@ export const getCardList = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -24,6 +30,7 @@ export const getMapInfo = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -48,18 +55,17 @@ export const updateMine = createRoute({
     body: {
       content: {
         "application/json": {
-          schema: z.object({
-            username: z.string().min(2).max(64).optional(),
-            avatar: z.string().optional(),
-            email: z.string().email().optional(),
-            remark: z.string().max(255).optional(),
-          }),
+          schema: UpdateMineSchema,
         },
       },
     },
   },
   responses: {
     "200": { description: "更新个人信息成功" },
+    "400": {
+      description: "参数错误",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
@@ -75,13 +81,41 @@ export const resetMinePassword = createRoute({
     body: {
       content: {
         "application/json": {
-          schema: z.object({ password: z.string().min(6).max(64) }),
+          schema: ResetMinePasswordSchema,
         },
       },
     },
   },
   responses: {
     "200": { description: "更新密码成功" },
+    "400": {
+      description: "参数错误",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+  },
+});
+
+export const uploadMineAvatar = createRoute({
+  method: "post",
+  path: "/mine/upload/avatar",
+  tags: ["dashboard"],
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": { schema: UploadMineAvatarSchema },
+      },
+    },
+  },
+  responses: {
+    "200": { description: "上传头像成功" },
+    "400": {
+      description: "文件格式或大小不符合要求",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

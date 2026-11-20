@@ -1,10 +1,17 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { eq, and, ne, isNotNull, sql, asc } from "drizzle-orm";
-import { getAuth, getAuthEmail } from "../auth";
+import {
+  getAuth,
+  getAuthEmail,
+  PASSWORD_HASH_ROUNDS,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from "../auth";
 import { getDb } from "../db";
 import {
   authAccounts,
+  authSessions,
   authUsers,
   sysUsers,
   sysRoles,
@@ -17,12 +24,108 @@ import {
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   getUserCredentialByRefreshToken,
+  removeUserCredentialByOnlineUserId,
   replaceUserCredential,
   storeUserCredential,
 } from "./redis.service";
 
 function formatExpires(expiresAt: Date): string {
   return expiresAt.toISOString().replace("T", " ").slice(0, 19);
+}
+
+function assertPasswordPolicy(password: string): void {
+  if (
+    password.length < PASSWORD_MIN_LENGTH ||
+    password.length > PASSWORD_MAX_LENGTH
+  ) {
+    throw {
+      code: 10001,
+      message: `密码长度必须为 ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} 位`,
+      status: 400,
+    };
+  }
+}
+
+async function persistPasswordAndRevokeSessions(
+  userId: number,
+  password: string,
+  currentPassword?: string,
+): Promise<void> {
+  assertPasswordPolicy(password);
+
+  const db = await getDb();
+  const onlineUserIds = await db.transaction(async (tx) => {
+    const [user] = await tx
+      .select({ id: sysUsers.id, password: sysUsers.password })
+      .from(sysUsers)
+      .where(eq(sysUsers.id, userId))
+      .limit(1);
+    if (!user) {
+      throw { code: 10003, message: "用户不存在", status: 404 };
+    }
+
+    if (
+      currentPassword !== undefined &&
+      !(await bcrypt.compare(currentPassword, user.password))
+    ) {
+      throw { code: 10001, message: "当前密码不正确", status: 400 };
+    }
+
+    const now = new Date();
+    const passwordHash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
+    await tx
+      .update(sysUsers)
+      .set({ password: passwordHash, updatedAt: now })
+      .where(eq(sysUsers.id, userId));
+
+    const [authUser] = await tx
+      .select({ id: authUsers.id })
+      .from(authUsers)
+      .where(eq(authUsers.legacyUserId, userId))
+      .limit(1);
+    if (authUser) {
+      await tx
+        .update(authAccounts)
+        .set({ password: passwordHash, updatedAt: now })
+        .where(
+          and(
+            eq(authAccounts.userId, authUser.id),
+            eq(authAccounts.providerId, "credential"),
+          ),
+        );
+      await tx
+        .delete(authSessions)
+        .where(eq(authSessions.userId, authUser.id));
+    }
+
+    const onlineUsers = await tx
+      .select({ id: sysOnlineUsers.id })
+      .from(sysOnlineUsers)
+      .where(eq(sysOnlineUsers.userId, userId));
+    await tx.delete(sysOnlineUsers).where(eq(sysOnlineUsers.userId, userId));
+    return onlineUsers.map((onlineUser) => onlineUser.id);
+  });
+
+  await Promise.all(
+    onlineUserIds.map((onlineUserId) =>
+      removeUserCredentialByOnlineUserId(onlineUserId),
+    ),
+  );
+}
+
+export async function changeOwnPassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await persistPasswordAndRevokeSessions(userId, newPassword, currentPassword);
+}
+
+export async function resetUserPassword(
+  userId: number,
+  newPassword: string,
+): Promise<void> {
+  await persistPasswordAndRevokeSessions(userId, newPassword);
 }
 
 async function issueBetterAuthSession(
@@ -33,9 +136,10 @@ async function issueBetterAuthSession(
     avatar: string | null;
   },
   password: string,
+  request: Request,
 ): Promise<string> {
   const db = await getDb();
-  const auth = await getAuth();
+  const auth = await getAuth(request);
   const email = getAuthEmail(user.id);
   const [linkedUser] = await db
     .select({ id: authUsers.id })
@@ -60,36 +164,39 @@ async function issueBetterAuthSession(
   }
 
   const now = new Date();
-  await db
-    .update(authUsers)
-    .set({
-      name: user.username,
-      email,
-      image: user.avatar,
-      updatedAt: now,
-    } as Partial<typeof authUsers.$inferInsert>)
-    .where(eq(authUsers.id, linkedUser.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(authUsers)
+      .set({
+        name: user.username,
+        email,
+        image: user.avatar,
+        updatedAt: now,
+      } as Partial<typeof authUsers.$inferInsert>)
+      .where(eq(authUsers.id, linkedUser.id));
 
-  const [credentialAccount] = await db
-    .select({ id: authAccounts.id })
-    .from(authAccounts)
-    .where(
-      and(
-        eq(authAccounts.userId, linkedUser.id),
-        eq(authAccounts.providerId, "credential"),
-      ),
-    )
-    .limit(1);
+    const [credentialAccount] = await tx
+      .select({ id: authAccounts.id })
+      .from(authAccounts)
+      .where(
+        and(
+          eq(authAccounts.userId, linkedUser.id),
+          eq(authAccounts.providerId, "credential"),
+        ),
+      )
+      .limit(1);
 
-  if (credentialAccount) {
-    await db
-      .update(authAccounts)
-      .set({ password: user.password, updatedAt: now } as Partial<
-        typeof authAccounts.$inferInsert
-      >)
-      .where(eq(authAccounts.id, credentialAccount.id));
-  } else {
-    await db.insert(authAccounts).values({
+    if (credentialAccount) {
+      await tx
+        .update(authAccounts)
+        .set({ password: user.password, updatedAt: now } as Partial<
+          typeof authAccounts.$inferInsert
+        >)
+        .where(eq(authAccounts.id, credentialAccount.id));
+      return;
+    }
+
+    await tx.insert(authAccounts).values({
       id: randomUUID(),
       accountId: linkedUser.id,
       providerId: "credential",
@@ -98,7 +205,7 @@ async function issueBetterAuthSession(
       createdAt: now,
       updatedAt: now,
     } as typeof authAccounts.$inferInsert);
-  }
+  });
 
   const signedIn = await auth.api.signInEmail({
     body: { email, password, rememberMe: true },
@@ -112,6 +219,7 @@ async function issueBetterAuthSession(
 export async function login(
   username: string,
   password: string,
+  request: Request,
   clientInfo?: { ip?: string; ua?: string },
 ) {
   const db = await getDb();
@@ -148,7 +256,7 @@ export async function login(
     })
     .from(sysRoles)
     .innerJoin(sysUserRoles, eq(sysRoles.id, sysUserRoles.roleId))
-    .where(eq(sysUserRoles.userId, user.id))
+    .where(and(eq(sysUserRoles.userId, user.id), eq(sysRoles.status, 1)))
     .orderBy(asc(sysRoles.id));
 
   const roleCodes = roles.map((r) => r.code);
@@ -187,13 +295,17 @@ export async function login(
     .limit(1);
 
   const perms = await db
-    .select({ auths: sysPages.auths })
+    .selectDistinct({ auths: sysPages.auths })
     .from(sysPages)
     .innerJoin(sysRolePages, eq(sysPages.id, sysRolePages.pageId))
     .innerJoin(sysUserRoles, eq(sysRolePages.roleId, sysUserRoles.roleId))
+    .innerJoin(sysRoles, eq(sysUserRoles.roleId, sysRoles.id))
     .where(
       and(
         eq(sysUserRoles.userId, user.id),
+        eq(sysRoles.status, 1),
+        eq(sysPages.menuType, 1),
+        eq(sysPages.status, 1),
         isNotNull(sysPages.auths),
         sql`${sysPages.auths} != ''`,
       ),
@@ -201,7 +313,7 @@ export async function login(
 
   const permList = perms.map((p) => p.auths!).filter(Boolean);
 
-  const accessToken = await issueBetterAuthSession(user, password);
+  const accessToken = await issueBetterAuthSession(user, password, request);
   const refreshToken = accessToken;
   let credentialStored = false;
   let onlineUserId: number | null = null;
@@ -319,6 +431,7 @@ export async function register(
   password: string,
   confirmPassword: string,
 ) {
+  assertPasswordPolicy(password);
   if (password !== confirmPassword) {
     throw { code: 10001, message: "两次输入的密码不一致", status: 400 };
   }
@@ -355,7 +468,7 @@ export async function register(
   return { id: userId };
 }
 
-export async function refreshToken(token: string) {
+export async function refreshToken(token: string, request: Request) {
   if (!token) {
     throw { code: 10001, message: "请求参数缺失或格式不正确", status: 400 };
   }
@@ -365,7 +478,7 @@ export async function refreshToken(token: string) {
     throw { code: 10001, message: "登录状态已过期，请重新登录", status: 401 };
   }
 
-  const auth = await getAuth();
+  const auth = await getAuth(request);
   const session = await auth.api.getSession({
     headers: new Headers({ Authorization: `Bearer ${token}` }),
   });

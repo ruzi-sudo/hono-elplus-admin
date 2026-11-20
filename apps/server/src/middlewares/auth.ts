@@ -32,7 +32,7 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   try {
-    const auth = await getAuth();
+    const auth = await getAuth(c.req.raw);
     const authSession = await auth.api.getSession({
       headers: c.req.raw.headers,
     });

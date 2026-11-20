@@ -5,6 +5,7 @@ import { validatorParamsHook } from "../../common/validator";
 import * as routes from "./dashboard.routes";
 import * as dashboardService from "../../service/dashboard.service";
 import * as userService from "../../service/user.service";
+import * as authService from "../../service/auth.service";
 import { saveAvatar } from "../../service/upload.service";
 
 export const route = new OpenAPIHono({
@@ -78,7 +79,11 @@ route.openapi(routes.resetMinePassword, async (c) => {
   const user = getAuthenticatedUser(c);
   const body = c.req.valid("json");
   try {
-    await userService.resetPassword(user.userId, body.password);
+    await authService.changeOwnPassword(
+      user.userId,
+      body.currentPassword,
+      body.password,
+    );
     return c.json({ code: 0, message: "操作成功", data: {} });
   } catch (error: any) {
     return c.json(
@@ -92,13 +97,8 @@ route.openapi(routes.resetMinePassword, async (c) => {
   }
 });
 
-route.post("/mine/upload/avatar", async (c) => {
-  const body = await c.req.parseBody();
-  const file = body.file || body.files;
-  if (!(file instanceof File)) {
-    return c.json({ code: 10001, message: "请上传头像文件", data: {} }, 400);
-  }
-
+route.openapi(routes.uploadMineAvatar, async (c) => {
+  const { file } = c.req.valid("form");
   const url = await saveAvatar(file);
   return c.json({ code: 0, message: "操作成功", data: { url } });
 });

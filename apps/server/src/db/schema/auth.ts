@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { sysUsers } from "./users";
 
 export const authUsers = mysqlTable(
   "auth_users",
@@ -17,7 +18,9 @@ export const authUsers = mysqlTable(
     email: varchar("email", { length: 255 }).notNull(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: varchar("image", { length: 512 }),
-    legacyUserId: int("legacy_user_id").notNull(),
+    legacyUserId: int("legacy_user_id")
+      .notNull()
+      .references(() => sysUsers.id, { onDelete: "cascade" }),
     createdAt: datetime("created_at", { mode: "date" }).notNull(),
     updatedAt: datetime("updated_at", { mode: "date" }).notNull(),
   },

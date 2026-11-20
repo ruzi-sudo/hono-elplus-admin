@@ -197,21 +197,3 @@ export async function batchDeleteUser(ids: number[]) {
   const db = await getDb();
   await db.delete(sysUsers).where(inArray(sysUsers.id, ids));
 }
-
-export async function resetPassword(id: number, password: string) {
-  const db = await getDb();
-
-  const [existing] = await db
-    .select({ id: sysUsers.id })
-    .from(sysUsers)
-    .where(eq(sysUsers.id, id))
-    .limit(1);
-  if (!existing) {
-    throw { code: 10003, message: '用户不存在', status: 404 };
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  await db.update(sysUsers)
-    .set({ password: hashedPassword, updatedAt: new Date() } as Partial<typeof sysUsers.$inferInsert>)
-    .where(eq(sysUsers.id, id));
-}
