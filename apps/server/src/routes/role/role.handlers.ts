@@ -140,14 +140,12 @@ route.openapi(routes.updateApiPermission, async (c) => {
   }
 });
 
-route.openapi(routes.saveRolePermissions, async (c) => {
+route.openapi(routes.saveRoleApiPermissions, async (c) => {
   const body = c.req.valid("json");
   try {
-    await roleService.saveRolePermissions(
+    await roleService.saveRoleApiPermissions(
       body.id,
-      body.menuIds,
       body.apiPermissionIds,
-      body.homePageId,
       getAuthenticatedUser(c),
     );
     return c.json({ code: 0, message: "操作成功", data: {} });

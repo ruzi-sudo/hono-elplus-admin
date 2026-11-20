@@ -125,7 +125,7 @@ app.use(
   requireApiPermission(),
 );
 app.use(
-  "/role/save-permissions",
+  "/role/save-api-permissions",
   requireApiPermission(),
 );
 app.route("/", roleRoute);

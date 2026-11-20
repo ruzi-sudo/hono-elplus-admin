@@ -121,11 +121,9 @@ export const createApiPermission = (data?: object) => {
 export const updateApiPermission = (data?: object) => {
   return http.request<Result>("post", "/api/role-api-permissions/update", { data });
 };
-
-export const saveRolePermissions = (data?: object) => {
-  return http.request<Result>("post", "/api/role/save-permissions", { data });
+export const saveRoleApiPermissions = (data?: object) => {
+  return http.request<Result>("post", "/api/role/save-api-permissions", { data });
 };
-
 export const getRolePermissions = (data?: object) => {
   return http.request<RolePermissionResult>("post", "/api/role-permissions", { data });
 };

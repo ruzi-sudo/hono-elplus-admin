@@ -24,6 +24,50 @@ function assertMutableRole(code: string): void {
     throw new ParamsException("系统内置角色不允许修改");
   }
 }
+async function getUserApiPermissionIds(userId: number): Promise<Set<number>> {
+  const db = await getDb();
+  const rows = await db
+    .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
+    .from(sysRoleApiPermissions)
+    .innerJoin(sysUserRoles, eq(sysRoleApiPermissions.roleId, sysUserRoles.roleId))
+    .innerJoin(sysRoles, eq(sysRoleApiPermissions.roleId, sysRoles.id))
+    .where(
+      and(eq(sysUserRoles.userId, userId), eq(sysRoles.status, 1)),
+    );
+  return new Set(rows.map((row) => row.apiPermissionId));
+}
+
+async function assertValidHomePage(
+  db: any,
+  menuIds: number[],
+  homePageId: number | null,
+): Promise<void> {
+  if (homePageId === null) return;
+  if (!menuIds.includes(homePageId)) {
+    throw new ParamsException("角色首页必须包含在菜单权限中");
+  }
+
+  const [homePage] = await db
+    .select({
+      menuType: sysPages.menuType,
+      path: sysPages.path,
+      component: sysPages.component,
+      status: sysPages.status,
+    })
+    .from(sysPages)
+    .where(eq(sysPages.id, homePageId))
+    .limit(1);
+  if (
+    !homePage ||
+    homePage.menuType === 1 ||
+    homePage.status !== 1 ||
+    !homePage.path ||
+    homePage.path === "/" ||
+    !homePage.component
+  ) {
+    throw new ParamsException("角色首页必须是已启用且可访问的页面");
+  }
+}
 
 async function getUserPageIds(userId: number): Promise<Set<number>> {
   const db = await getDb();
@@ -342,6 +386,9 @@ export async function deleteRole(id: number) {
 
   // 先删除角色关联的权限和用户关系
   await db.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
+  await db
+    .delete(sysRoleApiPermissions)
+    .where(eq(sysRoleApiPermissions.roleId, id));
   await db.delete(sysUserRoles).where(eq(sysUserRoles.roleId, id));
   await db.delete(sysRoles).where(eq(sysRoles.id, id));
 
@@ -411,39 +458,7 @@ export async function saveRoleMenu(
     }
   }
 
-  if (homePageId !== null) {
-    if (!uniqueMenuIds.includes(homePageId)) {
-      throw {
-        code: 10001,
-        message: "角色首页必须包含在菜单权限中",
-        status: 400,
-      };
-    }
-    const [homePage] = await db
-      .select({
-        menuType: sysPages.menuType,
-        path: sysPages.path,
-        component: sysPages.component,
-        status: sysPages.status,
-      })
-      .from(sysPages)
-      .where(eq(sysPages.id, homePageId))
-      .limit(1);
-    if (
-      !homePage ||
-      homePage.menuType === 1 ||
-      homePage.status !== 1 ||
-      !homePage.path ||
-      homePage.path === "/" ||
-      !homePage.component
-    ) {
-      throw {
-        code: 10001,
-        message: "角色首页必须是已启用且可访问的页面",
-        status: 400,
-      };
-    }
-  }
+  await assertValidHomePage(db, uniqueMenuIds, homePageId);
 
   await db.transaction(async (tx) => {
     await tx.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
@@ -463,16 +478,12 @@ export async function saveRoleMenu(
       .where(eq(sysRoles.id, id));
   });
 }
-
-export async function saveRolePermissions(
+export async function saveRoleApiPermissions(
   id: number,
-  menuIds: number[],
   apiPermissionIds: number[],
-  homePageId: number | null,
   user: AuthenticatedUser,
 ) {
   const db = await getDb();
-  const uniqueMenuIds = [...new Set(menuIds)];
   const uniqueApiPermissionIds = [...new Set(apiPermissionIds)];
   const [role] = await db
     .select({ id: sysRoles.id, code: sysRoles.code })
@@ -483,24 +494,14 @@ export async function saveRolePermissions(
   assertMutableRole(role.code);
 
   if (!isSystemAdmin(user)) {
-    const allowedPageIds = await getUserPageIds(user.userId);
-    if (uniqueMenuIds.some((pageId) => !allowedPageIds.has(pageId))) {
-      throw new ForbiddenException("只能配置自身已有权限范围内的菜单");
+    const allowedApiPermissionIds = await getUserApiPermissionIds(user.userId);
+    if (
+      uniqueApiPermissionIds.some(
+        (permissionId) => !allowedApiPermissionIds.has(permissionId),
+      )
+    ) {
+      throw new ForbiddenException("只能配置自身已有权限范围内的接口");
     }
-  }
-
-  if (uniqueMenuIds.length > 0) {
-    const pages = await db
-      .select({ id: sysPages.id })
-      .from(sysPages)
-      .where(inArray(sysPages.id, uniqueMenuIds));
-    if (pages.length !== uniqueMenuIds.length) {
-      throw new ParamsException("菜单权限中包含不存在的页面");
-    }
-  }
-
-  if (homePageId !== null && !uniqueMenuIds.includes(homePageId)) {
-    throw new ParamsException("角色首页必须包含在菜单权限中");
   }
 
   if (uniqueApiPermissionIds.length > 0) {
@@ -514,13 +515,9 @@ export async function saveRolePermissions(
   }
 
   await db.transaction(async (tx) => {
-    await tx.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
-    await tx.delete(sysRoleApiPermissions).where(eq(sysRoleApiPermissions.roleId, id));
-    if (uniqueMenuIds.length > 0) {
-      await tx.insert(sysRolePages).values(
-        uniqueMenuIds.map((pageId) => ({ roleId: id, pageId })),
-      );
-    }
+    await tx
+      .delete(sysRoleApiPermissions)
+      .where(eq(sysRoleApiPermissions.roleId, id));
     if (uniqueApiPermissionIds.length > 0) {
       await tx.insert(sysRoleApiPermissions).values(
         uniqueApiPermissionIds.map((apiPermissionId) => ({
@@ -529,9 +526,5 @@ export async function saveRolePermissions(
         })),
       );
     }
-    await tx
-      .update(sysRoles)
-      .set({ homePageId, updatedAt: new Date() })
-      .where(eq(sysRoles.id, id));
   });
 }

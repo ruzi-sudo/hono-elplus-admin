@@ -25,12 +25,9 @@ export const SaveRoleMenuSchema = z.object({
   menuIds: z.array(z.number().positive().int()).max(5000),
   homePageId: z.number().positive().int().nullable().openapi({ example: 2 }),
 });
-
-export const SaveRolePermissionsSchema = z.object({
+export const SaveRoleApiPermissionsSchema = z.object({
   id: z.number().positive().int().openapi({ example: 1 }),
-  menuIds: z.array(z.number().positive().int()).max(5000),
   apiPermissionIds: z.array(z.number().positive().int()).max(5000),
-  homePageId: z.number().positive().int().nullable().openapi({ example: 2 }),
 });
 
 export const ApiPermissionSchema = z.object({

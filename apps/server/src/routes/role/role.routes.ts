@@ -4,7 +4,7 @@ import {
   ListRolesQuerySchema,
   RoleMenuIdsSchema,
   SaveRoleMenuSchema,
-  SaveRolePermissionsSchema,
+  SaveRoleApiPermissionsSchema,
   UpdateApiPermissionSchema,
 } from "./role.schemas";
 import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
@@ -133,7 +133,6 @@ export const roleMenu = createRoute({
   },
 });
 
-
 export const roleMenuIds = createRoute({
   method: "post",
   path: "/role-menu-ids",
@@ -182,17 +181,19 @@ export const getRolePermissions = createRoute({
   },
 });
 
-export const saveRolePermissions = createRoute({
+export const saveRoleApiPermissions = createRoute({
   method: "post",
-  path: "/role/save-permissions",
+  path: "/role/save-api-permissions",
   tags: ["role"],
   request: {
     body: {
-      content: { "application/json": { schema: SaveRolePermissionsSchema } },
+      content: {
+        "application/json": { schema: SaveRoleApiPermissionsSchema },
+      },
     },
   },
   responses: {
-    "200": { description: "保存角色权限成功" },
+    "200": { description: "保存角色接口权限成功" },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

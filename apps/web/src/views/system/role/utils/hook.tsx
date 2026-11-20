@@ -19,7 +19,8 @@ import {
   createRole,
   updateRole,
   deleteRole,
-  saveRolePermissions,
+  saveRoleMenu,
+  saveRoleApiPermissions,
 } from "@/api/system";
 import {
   type Ref,
@@ -348,16 +349,24 @@ export function useRole(treeRef: Ref) {
   async function handleSave() {
     const { id, name } = curRow.value;
     const menuIds = treeRef.value.getCheckedKeys() as number[];
-    const { code, message: msg } = await saveRolePermissions({
+    const { code: menuCode, message: menuMessage } = await saveRoleMenu({
       id,
       menuIds,
-      apiPermissionIds: checkedApiPermissionIds.value,
       homePageId: homePageId.value,
+    });
+    if (menuCode !== 0) {
+      message(menuMessage || "菜单权限保存失败", { type: "error" });
+      return;
+    }
+
+    const { code, message: msg } = await saveRoleApiPermissions({
+      id,
+      apiPermissionIds: checkedApiPermissionIds.value,
     });
     if (code === 0) {
       message(`角色 ${name} 的权限修改成功`, { type: "success" });
     } else {
-      message(msg || "保存失败", { type: "error" });
+      message(msg || "接口权限保存失败", { type: "error" });
     }
   }
 
