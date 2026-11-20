@@ -12,6 +12,7 @@ import type { FormInstance, FormRules } from "element-plus";
 import ReCropperPreview from "@/components/ReCropperPreview";
 import { createFormData, deviceDetection } from "@pureadmin/utils";
 import uploadLine from "~icons/ri/upload-line";
+import { useUserStoreHook } from "@/store/modules/user";
 
 defineOptions({
   name: "Profile",
@@ -40,6 +41,7 @@ const userInfos = reactive({
 });
 
 const passwordForm = reactive({
+  currentPassword: "",
   password: "",
   confirmPassword: "",
 });
@@ -53,6 +55,10 @@ const rules = reactive<FormRules<UserInfo & { id: number | null }>>({
 });
 
 const passwordRules = reactive<FormRules>({
+  currentPassword: [
+    { required: true, message: "请输入当前密码", trigger: "blur" },
+    { min: 6, message: "密码至少 6 位", trigger: "blur" },
+  ],
   password: [
     { required: true, message: "请输入新密码", trigger: "blur" },
     { min: 6, message: "密码至少 6 位", trigger: "blur" },
@@ -122,7 +128,7 @@ const onSubmit = async (formEl: FormInstance) => {
       const { code, message: msg } = await updateMine({
         username: userInfos.username,
         email: userInfos.email,
-        remark: userInfos.remark || userInfos.description,
+        remark: userInfos.description,
       });
       if (code !== 0) {
         message(msg || "更新信息失败", { type: "error" });
@@ -134,6 +140,7 @@ const onSubmit = async (formEl: FormInstance) => {
 };
 
 const openPasswordDialog = () => {
+  passwordForm.currentPassword = "";
   passwordForm.password = "";
   passwordForm.confirmPassword = "";
   passwordDialogVisible.value = true;
@@ -144,14 +151,16 @@ const handleResetPassword = async () => {
   await passwordFormRef.value.validate(async (valid) => {
     if (!valid) return;
     const { code, message: msg } = await resetMinePassword({
+      currentPassword: passwordForm.currentPassword,
       password: passwordForm.password,
     });
     if (code !== 0) {
       message(msg || "重置密码失败", { type: "error" });
       return;
     }
-    message("密码已更新", { type: "success" });
+    message("密码已更新，请重新登录", { type: "success" });
     passwordDialogVisible.value = false;
+    useUserStoreHook().clearLoginState();
   });
 };
 
@@ -264,6 +273,14 @@ onMounted(async () => {
         :rules="passwordRules"
         label-position="top"
       >
+        <el-form-item label="当前密码" prop="currentPassword">
+          <el-input
+            v-model="passwordForm.currentPassword"
+            type="password"
+            show-password
+            placeholder="请输入当前密码"
+          />
+        </el-form-item>
         <el-form-item label="新密码" prop="password">
           <el-input
             v-model="passwordForm.password"

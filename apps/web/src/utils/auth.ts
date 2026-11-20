@@ -139,3 +139,8 @@ export const hasPerms = (value: string | Array<string>): boolean => {
     : isIncludeAllChildren(value, permissions);
   return isAuths ? true : false;
 };
+
+/** 是否拥有任意一个按钮权限 */
+export const hasAnyPerms = (values: Array<string>): boolean => {
+  return values.some((value) => hasPerms(value));
+};

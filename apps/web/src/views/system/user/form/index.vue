@@ -5,6 +5,7 @@ import { formRules } from "../utils/rule";
 import { FormProps } from "../utils/types";
 import { usePublicHooks } from "../../hooks";
 import { getAllRoleList } from "@/api/system";
+import { hasPerms } from "@/utils/auth";
 
 const props = withDefaults(defineProps<FormProps>(), {
   formInline: () => ({
@@ -22,8 +23,10 @@ const ruleFormRef = ref();
 const { switchStyle } = usePublicHooks();
 const newFormInline = ref(props.formInline);
 const roleOptions = ref<{ id: number; name: string }[]>([]);
+const canAssignRoles = hasPerms("system-user:assign-role");
 
 onMounted(async () => {
+  if (!canAssignRoles) return;
   const { data } = await getAllRoleList();
   roleOptions.value = data ?? [];
 });
@@ -43,7 +46,7 @@ defineExpose({ getRef });
     label-width="82px"
   >
     <el-row :gutter="30">
-      <re-col :value="12" :xs="24" :sm="24">
+      <re-col v-if="canAssignRoles" :value="12" :xs="24" :sm="24">
         <el-form-item label="用户名称" prop="username">
           <el-input
             v-model="newFormInline.username"

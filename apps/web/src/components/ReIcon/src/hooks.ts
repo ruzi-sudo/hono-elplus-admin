@@ -82,7 +82,7 @@ export function useRenderIcon(icon: any, attrs?: iconType): Component {
       },
     });
   } else {
-    // 离线图标统一以 `prefix/name` 注册，同时兼容接口返回的 `prefix:name`。
+    // Iconify 使用 `prefix:name`，同时兼容接口返回的 `prefix/name`。
     return defineComponent({
       name: "Icon",
       render() {

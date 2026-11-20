@@ -6,6 +6,7 @@ import { message } from "@/utils/message";
 import userAvatar from "@/assets/user.jpg";
 import { usePublicHooks } from "../../hooks";
 import { addDialog } from "@/components/ReDialog";
+import { hasPerms } from "@/utils/auth";
 import type { PaginationProps } from "@pureadmin/table";
 import ReCropperPreview from "@/components/ReCropperPreview";
 import type { FormItemProps } from "../utils/types";
@@ -15,7 +16,14 @@ import {
   hideTextAtIndex,
   deviceDetection,
 } from "@pureadmin/utils";
-import { getUserList, createUser, updateUser, deleteUser, batchDeleteUser, resetPassword } from "@/api/system";
+import {
+  getUserList,
+  createUser,
+  updateUser,
+  deleteUser,
+  batchDeleteUser,
+  resetPassword,
+} from "@/api/system";
 import {
   ElForm,
   ElInput,
@@ -35,6 +43,8 @@ import {
 } from "vue";
 
 export function useUser(tableRef: Ref) {
+  const canAssignRoles = hasPerms("system-user:assign-role");
+  const canEditUsers = hasPerms("system-user:edit");
   const form = reactive({
     username: "",
     email: "",
@@ -82,14 +92,23 @@ export function useUser(tableRef: Ref) {
       minWidth: 120,
       cellRenderer: ({ row }) => {
         const roles = row.roles || [];
-        if (!roles.length) return <el-tag type="info" size="small">未分配</el-tag>;
+        if (!roles.length)
+          return (
+            <el-tag type="info" size="small">
+              未分配
+            </el-tag>
+          );
         const visible = roles.slice(0, 2);
         const rest = roles.slice(2);
         return (
           <span>
-            {visible.map(r => <el-tag class="mr-1" size="small">{r}</el-tag>)}
+            {visible.map((r) => (
+              <el-tag class="mr-1" size="small">
+                {r}
+              </el-tag>
+            ))}
             {rest.length > 0 && (
-              <el-tooltip content={rest.join('、')} placement="top">
+              <el-tooltip content={rest.join("、")} placement="top">
                 <el-tag size="small">+{rest.length}</el-tag>
               </el-tooltip>
             )}
@@ -101,20 +120,25 @@ export function useUser(tableRef: Ref) {
       label: "状态",
       prop: "status",
       minWidth: 90,
-      cellRenderer: (scope) => (
-        <el-switch
-          size={scope.props.size === "small" ? "small" : "default"}
-          loading={switchLoadMap.value[scope.index]?.loading}
-          v-model={scope.row.status}
-          active-value={1}
-          inactive-value={0}
-          active-text="已启用"
-          inactive-text="已停用"
-          inline-prompt
-          style={switchStyle.value}
-          onChange={() => onChange(scope as any)}
-        />
-      ),
+      cellRenderer: (scope) =>
+        canEditUsers ? (
+          <el-switch
+            size={scope.props.size === "small" ? "small" : "default"}
+            loading={switchLoadMap.value[scope.index]?.loading}
+            v-model={scope.row.status}
+            active-value={1}
+            inactive-value={0}
+            active-text="已启用"
+            inactive-text="已停用"
+            inline-prompt
+            style={switchStyle.value}
+            onChange={() => onChange(scope as any)}
+          />
+        ) : (
+          <el-tag type={scope.row.status === 1 ? "success" : "info"} size="small">
+            {scope.row.status === 1 ? "已启用" : "已停用"}
+          </el-tag>
+        ),
     },
     {
       label: "创建时间",
@@ -174,9 +198,15 @@ export function useUser(tableRef: Ref) {
       return;
     }
 
-    switchLoadMap.value[index] = { ...switchLoadMap.value[index], loading: true };
+    switchLoadMap.value[index] = {
+      ...switchLoadMap.value[index],
+      loading: true,
+    };
     const { code } = await updateUser({ id: row.id, status: row.status });
-    switchLoadMap.value[index] = { ...switchLoadMap.value[index], loading: false };
+    switchLoadMap.value[index] = {
+      ...switchLoadMap.value[index],
+      loading: false,
+    };
     if (code === 0) {
       message("已成功修改用户状态", { type: "success" });
     } else {
@@ -221,7 +251,8 @@ export function useUser(tableRef: Ref) {
   async function onbatchDel() {
     const curSelected = tableRef.value.getTableRef().getSelectionRows();
     const ids = getKeyList(curSelected, "id");
-    if (!ids.length) return message("请先选择要删除的用户", { type: "warning" });
+    if (!ids.length)
+      return message("请先选择要删除的用户", { type: "warning" });
     const { code } = await batchDeleteUser({ ids });
     if (code === 0) {
       message(`已删除 ${ids.length} 个用户`, { type: "success" });
@@ -232,7 +263,11 @@ export function useUser(tableRef: Ref) {
 
   async function onSearch() {
     loading.value = true;
-    const { code, data } = await getUserList({ ...toRaw(form), pageNum: pagination.currentPage, pageSize: pagination.pageSize });
+    const { code, data } = await getUserList({
+      ...toRaw(form),
+      pageNum: pagination.currentPage,
+      pageSize: pagination.pageSize,
+    });
     if (code === 0) {
       dataList.value = data.list;
       pagination.total = data.total;
@@ -261,7 +296,9 @@ export function useUser(tableRef: Ref) {
           username: row?.username ?? "",
           password: row?.password ?? "",
           email: row?.email ?? "",
-          roleIds: row?.roleIds ?? (title === '新增' ? [2] : undefined),
+          roleIds: canAssignRoles
+            ? row?.roleIds ?? (title === "新增" ? [2] : undefined)
+            : undefined,
           status: row?.status ?? 1,
           remark: row?.remark ?? "",
         },
@@ -277,17 +314,22 @@ export function useUser(tableRef: Ref) {
         const curData = options.props.formInline as FormItemProps;
         FormRef.validate(async (valid) => {
           if (valid) {
+            const payload = { ...curData };
+            if (!canAssignRoles) delete payload.roleIds;
             if (title === "新增") {
-              const { code, message: msg } = await createUser(curData);
+              const { code, message: msg } = await createUser(payload);
               if (code !== 0) {
-                message(msg || '创建失败', { type: "error" });
+                message(msg || "创建失败", { type: "error" });
                 return;
               }
               message(`已新增用户 ${curData.username}`, { type: "success" });
             } else {
-              const { code, message: msg } = await updateUser({ id: curData.id, ...curData });
+              const { code, message: msg } = await updateUser({
+                id: curData.id,
+                ...payload,
+              });
               if (code !== 0) {
-                message(msg || '修改失败', { type: "error" });
+                message(msg || "修改失败", { type: "error" });
                 return;
               }
               message(`已修改用户 ${curData.username}`, { type: "success" });
@@ -387,12 +429,17 @@ export function useUser(tableRef: Ref) {
       beforeSure: async (done) => {
         ruleFormRef.value.validate(async (valid) => {
           if (valid) {
-            const { code, message: msg } = await resetPassword({ id: row.id, password: pwdForm.newPwd });
+            const { code, message: msg } = await resetPassword({
+              id: row.id,
+              password: pwdForm.newPwd,
+            });
             if (code !== 0) {
-              message(msg || '重置失败', { type: "error" });
+              message(msg || "重置失败", { type: "error" });
               return;
             }
-            message(`已成功重置 ${row.username} 用户的密码`, { type: "success" });
+            message(`已成功重置 ${row.username} 用户的密码`, {
+              type: "success",
+            });
             done();
             onSearch();
           }

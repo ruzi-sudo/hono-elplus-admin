@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useUser } from "./utils/hook";
 import { PureTableBar } from "@/components/RePureTableBar";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
+import { hasAnyPerms } from "@/utils/auth";
 
 import Upload from "~icons/ri/upload-line";
 import Password from "~icons/ri/lock-password-line";
@@ -184,7 +185,14 @@ const {
                   </template>
                 </el-popconfirm>
               </Auth>
-              <el-dropdown>
+              <el-dropdown
+                v-if="
+                  hasAnyPerms([
+                    'system-user:upload-avatar',
+                    'system-user:reset-password',
+                  ])
+                "
+              >
                 <el-button
                   class="ml-3! mt-0.5!"
                   link
