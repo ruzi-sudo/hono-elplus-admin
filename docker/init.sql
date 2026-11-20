@@ -150,6 +150,36 @@ CREATE TABLE IF NOT EXISTS sys_pages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='页面/菜单表';
 
 -- ----------------------------
+-- 6A. 接口权限表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_api_permissions (
+    id              INT PRIMARY KEY AUTO_INCREMENT,
+    code            VARCHAR(128) NOT NULL UNIQUE,
+    name            VARCHAR(128) NOT NULL,
+    module          VARCHAR(64) NOT NULL,
+    method          VARCHAR(16) NOT NULL,
+    path            VARCHAR(255) NOT NULL,
+    status          TINYINT DEFAULT 1,
+    description     VARCHAR(255),
+    sort            INT DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_api_permissions_method_path (method, path),
+    KEY idx_api_permissions_module (module)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='接口权限表';
+
+CREATE TABLE IF NOT EXISTS sys_role_api_permissions (
+    id                INT PRIMARY KEY AUTO_INCREMENT,
+    role_id           INT NOT NULL,
+    api_permission_id INT NOT NULL,
+    UNIQUE KEY uk_role_api_permission (role_id, api_permission_id),
+    KEY idx_role_api_permissions_role_id (role_id),
+    KEY idx_role_api_permissions_api_id (api_permission_id),
+    CONSTRAINT fk_role_api_permissions_role
+      FOREIGN KEY (role_id) REFERENCES sys_roles(id) ON DELETE CASCADE,
+    CONSTRAINT fk_role_api_permissions_api
+      FOREIGN KEY (api_permission_id) REFERENCES sys_api_permissions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色接口权限关联表';
 -- 6. 角色页面权限关联表
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS sys_role_pages (

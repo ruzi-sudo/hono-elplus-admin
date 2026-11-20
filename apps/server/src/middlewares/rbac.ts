@@ -2,10 +2,16 @@ import type { Context, Next } from "hono";
 import { and, eq } from "drizzle-orm";
 import { ForbiddenException } from "../common/exception";
 import { getDb } from "../db";
-import { sysPages, sysRolePages, sysRoles, sysUserRoles } from "../db/schema";
+import {
+  sysApiPermissions,
+  sysPages,
+  sysRoleApiPermissions,
+  sysRolePages,
+  sysRoles,
+  sysUserRoles,
+} from "../db/schema";
 import { getAuthenticatedUser, type AuthenticatedUser } from "./auth";
 
-type PermissionResolver = string | ((c: Context) => string | Promise<string>);
 
 export function isSystemAdmin(user: AuthenticatedUser): boolean {
   return user.roles.includes("admin");
@@ -36,7 +42,7 @@ export async function hasPageAccess(
   return Boolean(row);
 }
 
-export async function hasPermission(
+export async function hasButtonPermission(
   userId: number,
   permission: string,
 ): Promise<boolean> {
@@ -61,16 +67,68 @@ export async function hasPermission(
   return Boolean(row);
 }
 
-export async function assertPermission(
+export async function hasApiPermission(
+  userId: number,
+  method: string,
+  path: string,
+): Promise<boolean> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ id: sysApiPermissions.id })
+    .from(sysApiPermissions)
+    .innerJoin(
+      sysRoleApiPermissions,
+      eq(sysApiPermissions.id, sysRoleApiPermissions.apiPermissionId),
+    )
+    .innerJoin(
+      sysUserRoles,
+      eq(sysRoleApiPermissions.roleId, sysUserRoles.roleId),
+    )
+    .innerJoin(sysRoles, eq(sysRoleApiPermissions.roleId, sysRoles.id))
+    .where(
+      and(
+        eq(sysUserRoles.userId, userId),
+        eq(sysApiPermissions.method, method),
+        eq(sysApiPermissions.path, path),
+        eq(sysApiPermissions.status, 1),
+        eq(sysRoles.status, 1),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(row);
+}
+
+export async function assertButtonPermission(
   user: AuthenticatedUser,
   permission: string,
 ): Promise<void> {
   if (
     !isSystemAdmin(user) &&
-    !(await hasPermission(user.userId, permission))
+    !(await hasButtonPermission(user.userId, permission))
   ) {
-    throw new ForbiddenException(`缺少接口权限 ${permission}`);
+    throw new ForbiddenException(`缺少按钮权限 ${permission}`);
   }
+}
+
+export async function assertApiPermission(
+  user: AuthenticatedUser,
+  method: string,
+  path: string,
+): Promise<void> {
+  if (
+    !isSystemAdmin(user) &&
+    !(await hasApiPermission(user.userId, method, path))
+  ) {
+    throw new ForbiddenException(`缺少接口权限 ${method} ${path}`);
+  }
+}
+
+export async function assertPermission(
+  user: AuthenticatedUser,
+  permission: string,
+): Promise<void> {
+  return assertButtonPermission(user, permission);
 }
 
 export function requirePageAccess(pageName: string) {
@@ -86,12 +144,12 @@ export function requirePageAccess(pageName: string) {
   };
 }
 
-export function requirePermission(requirement: PermissionResolver) {
+export function requireApiPermission() {
   return async (c: Context, next: Next) => {
     const user = getAuthenticatedUser(c);
-    const permission =
-      typeof requirement === "function" ? await requirement(c) : requirement;
-    await assertPermission(user, permission);
+    const method = c.req.method;
+    const path = c.req.path.replace(/^\/api/, "") || "/";
+    await assertApiPermission(user, method, path);
     await next();
   };
 }

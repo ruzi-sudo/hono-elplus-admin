@@ -1,8 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  CreateApiPermissionSchema,
   ListRolesQuerySchema,
   RoleMenuIdsSchema,
   SaveRoleMenuSchema,
+  SaveRolePermissionsSchema,
+  UpdateApiPermissionSchema,
 } from "./role.schemas";
 import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
 
@@ -130,6 +133,7 @@ export const roleMenu = createRoute({
   },
 });
 
+
 export const roleMenuIds = createRoute({
   method: "post",
   path: "/role-menu-ids",
@@ -139,6 +143,94 @@ export const roleMenuIds = createRoute({
   },
   responses: {
     "200": { description: "角色已分配的菜单ID" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const listApiPermissions = createRoute({
+  method: "get",
+  path: "/role-api-permissions",
+  tags: ["role"],
+  responses: {
+    "200": { description: "接口权限列表" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const getRolePermissions = createRoute({
+  method: "post",
+  path: "/role-permissions",
+  tags: ["role"],
+  request: {
+    body: { content: { "application/json": { schema: RoleMenuIdsSchema } } },
+  },
+  responses: {
+    "200": { description: "角色权限" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const saveRolePermissions = createRoute({
+  method: "post",
+  path: "/role/save-permissions",
+  tags: ["role"],
+  request: {
+    body: {
+      content: { "application/json": { schema: SaveRolePermissionsSchema } },
+    },
+  },
+  responses: {
+    "200": { description: "保存角色权限成功" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const createApiPermission = createRoute({
+  method: "post",
+  path: "/role-api-permissions/create",
+  tags: ["role"],
+  request: {
+    body: {
+      content: { "application/json": { schema: CreateApiPermissionSchema } },
+    },
+  },
+  responses: {
+    "200": { description: "创建接口权限成功" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const updateApiPermission = createRoute({
+  method: "post",
+  path: "/role-api-permissions/update",
+  tags: ["role"],
+  request: {
+    body: {
+      content: { "application/json": { schema: UpdateApiPermissionSchema } },
+    },
+  },
+  responses: {
+    "200": { description: "更新接口权限成功" },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

@@ -7,6 +7,8 @@ import {
   sysRolePages,
   sysUsers,
   sysPages,
+  sysApiPermissions,
+  sysRoleApiPermissions,
 } from "../db/schema";
 import { ForbiddenException, ParamsException } from "../common/exception";
 import type { AuthenticatedUser } from "../middlewares/auth";
@@ -90,6 +92,83 @@ export async function getRoleIdsByUserId(userId: number) {
     .from(sysUserRoles)
     .where(eq(sysUserRoles.userId, userId));
   return rows.map((r) => r.roleId);
+}
+
+export async function listApiPermissions(includeDisabled = false) {
+  const db = await getDb();
+  const query = db
+    .select({
+      id: sysApiPermissions.id,
+      code: sysApiPermissions.code,
+      name: sysApiPermissions.name,
+      module: sysApiPermissions.module,
+      method: sysApiPermissions.method,
+      path: sysApiPermissions.path,
+      description: sysApiPermissions.description,
+      sort: sysApiPermissions.sort,
+      status: sysApiPermissions.status,
+    })
+    .from(sysApiPermissions)
+    .orderBy(
+      sysApiPermissions.module,
+      sysApiPermissions.sort,
+      sysApiPermissions.id,
+    );
+  return includeDisabled
+    ? query
+    : query.where(eq(sysApiPermissions.status, 1));
+}
+
+export async function createApiPermission(input: {
+  code: string;
+  name: string;
+  module: string;
+  method: string;
+  path: string;
+  description?: string;
+  sort?: number;
+}) {
+  const db = await getDb();
+  const [result] = await db.insert(sysApiPermissions).values(input);
+  return { id: result.insertId };
+}
+
+export async function updateApiPermission(input: {
+  id: number;
+  code?: string;
+  name?: string;
+  module?: string;
+  method?: string;
+  path?: string;
+  description?: string;
+  sort?: number;
+  status?: number;
+}) {
+  const db = await getDb();
+  await db
+    .update(sysApiPermissions)
+    .set({ ...input, updatedAt: new Date() })
+    .where(eq(sysApiPermissions.id, input.id));
+}
+
+export async function getRolePermissions(roleId: number) {
+  const db = await getDb();
+  const [role] = await db
+    .select({ homePageId: sysRoles.homePageId })
+    .from(sysRoles)
+    .where(eq(sysRoles.id, roleId))
+    .limit(1);
+  if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
+
+  const [menuRows, apiRows] = await Promise.all([
+    db.select({ pageId: sysRolePages.pageId }).from(sysRolePages).where(eq(sysRolePages.roleId, roleId)),
+    db.select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId }).from(sysRoleApiPermissions).where(eq(sysRoleApiPermissions.roleId, roleId)),
+  ]);
+  return {
+    menuIds: menuRows.map((row) => row.pageId),
+    apiPermissionIds: apiRows.map((row) => row.apiPermissionId),
+    homePageId: role.homePageId ?? null,
+  };
 }
 
 export async function getRolePermission(roleId: number) {
@@ -381,6 +460,78 @@ export async function saveRoleMenu(
         homePageId,
         updatedAt: new Date(),
       } as Partial<typeof sysRoles.$inferInsert>)
+      .where(eq(sysRoles.id, id));
+  });
+}
+
+export async function saveRolePermissions(
+  id: number,
+  menuIds: number[],
+  apiPermissionIds: number[],
+  homePageId: number | null,
+  user: AuthenticatedUser,
+) {
+  const db = await getDb();
+  const uniqueMenuIds = [...new Set(menuIds)];
+  const uniqueApiPermissionIds = [...new Set(apiPermissionIds)];
+  const [role] = await db
+    .select({ id: sysRoles.id, code: sysRoles.code })
+    .from(sysRoles)
+    .where(eq(sysRoles.id, id))
+    .limit(1);
+  if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
+  assertMutableRole(role.code);
+
+  if (!isSystemAdmin(user)) {
+    const allowedPageIds = await getUserPageIds(user.userId);
+    if (uniqueMenuIds.some((pageId) => !allowedPageIds.has(pageId))) {
+      throw new ForbiddenException("只能配置自身已有权限范围内的菜单");
+    }
+  }
+
+  if (uniqueMenuIds.length > 0) {
+    const pages = await db
+      .select({ id: sysPages.id })
+      .from(sysPages)
+      .where(inArray(sysPages.id, uniqueMenuIds));
+    if (pages.length !== uniqueMenuIds.length) {
+      throw new ParamsException("菜单权限中包含不存在的页面");
+    }
+  }
+
+  if (homePageId !== null && !uniqueMenuIds.includes(homePageId)) {
+    throw new ParamsException("角色首页必须包含在菜单权限中");
+  }
+
+  if (uniqueApiPermissionIds.length > 0) {
+    const apiRows = await db
+      .select({ id: sysApiPermissions.id })
+      .from(sysApiPermissions)
+      .where(inArray(sysApiPermissions.id, uniqueApiPermissionIds));
+    if (apiRows.length !== uniqueApiPermissionIds.length) {
+      throw new ParamsException("接口权限中包含不存在的权限");
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
+    await tx.delete(sysRoleApiPermissions).where(eq(sysRoleApiPermissions.roleId, id));
+    if (uniqueMenuIds.length > 0) {
+      await tx.insert(sysRolePages).values(
+        uniqueMenuIds.map((pageId) => ({ roleId: id, pageId })),
+      );
+    }
+    if (uniqueApiPermissionIds.length > 0) {
+      await tx.insert(sysRoleApiPermissions).values(
+        uniqueApiPermissionIds.map((apiPermissionId) => ({
+          roleId: id,
+          apiPermissionId,
+        })),
+      );
+    }
+    await tx
+      .update(sysRoles)
+      .set({ homePageId, updatedAt: new Date() })
       .where(eq(sysRoles.id, id));
   });
 }

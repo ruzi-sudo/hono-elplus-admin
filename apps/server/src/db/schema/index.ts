@@ -7,6 +7,7 @@ export {
 } from "./auth";
 export { sysRoles } from "./roles";
 export { sysPages, sysRolePages } from "./pages";
+export { sysApiPermissions, sysRoleApiPermissions } from "./api-permissions";
 export {
   sysLoginLogs,
   sysSystemLogs,

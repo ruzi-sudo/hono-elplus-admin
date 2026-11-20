@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1795158966814,
+      "tag": "0000_add_api_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1795160473810,
+      "tag": "0001_add_api_permission_metadata",
+      "breakpoints": true
+    }
+  ]
+}

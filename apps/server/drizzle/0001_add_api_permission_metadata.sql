@@ -1,0 +1,2 @@
+-- API permission metadata is included in 0000_add_api_permissions.
+-- This migration is retained to preserve the existing migration sequence.

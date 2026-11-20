@@ -89,6 +89,76 @@ route.openapi(routes.saveRoleMenu, async (c) => {
   }
 });
 
+route.openapi(routes.listApiPermissions, async (c) => {
+  const data = await roleService.listApiPermissions(true);
+  return c.json({ code: 0, message: "操作成功", data });
+});
+
+route.openapi(routes.getRolePermissions, async (c) => {
+  const body = c.req.valid("json");
+  const data = await roleService.getRolePermissions(body.id);
+  return c.json({ code: 0, message: "操作成功", data });
+});
+
+route.openapi(routes.createApiPermission, async (c) => {
+  const body = c.req.valid("json") as {
+    code: string;
+    name: string;
+    module: string;
+    method: string;
+    path: string;
+    description?: string;
+    sort?: number;
+  };
+  try {
+    const data = await roleService.createApiPermission(body);
+    return c.json({ code: 0, message: "操作成功", data });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error("创建失败");
+    return c.json({ code: 10001, message: error.message, data: {} }, 400);
+  }
+});
+
+route.openapi(routes.updateApiPermission, async (c) => {
+  const body = c.req.valid("json") as {
+    id: number;
+    code?: string;
+    name?: string;
+    module?: string;
+    method?: string;
+    path?: string;
+    description?: string;
+    sort?: number;
+    status?: number;
+  };
+  try {
+    await roleService.updateApiPermission(body);
+    return c.json({ code: 0, message: "操作成功", data: {} });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error("更新失败");
+    return c.json({ code: 10001, message: error.message, data: {} }, 400);
+  }
+});
+
+route.openapi(routes.saveRolePermissions, async (c) => {
+  const body = c.req.valid("json");
+  try {
+    await roleService.saveRolePermissions(
+      body.id,
+      body.menuIds,
+      body.apiPermissionIds,
+      body.homePageId,
+      getAuthenticatedUser(c),
+    );
+    return c.json({ code: 0, message: "操作成功", data: {} });
+  } catch (err: any) {
+    return c.json(
+      { code: err.code || 10001, message: err.message || "保存失败", data: {} },
+      err.status || 400,
+    );
+  }
+});
+
 route.openapi(routes.roleMenu, async (c) => {
   const data = await menuService.getRoleMenuTree();
   return c.json({ code: 0, message: "操作成功", data });

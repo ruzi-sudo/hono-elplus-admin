@@ -25,3 +25,28 @@ export const SaveRoleMenuSchema = z.object({
   menuIds: z.array(z.number().positive().int()).max(5000),
   homePageId: z.number().positive().int().nullable().openapi({ example: 2 }),
 });
+
+export const SaveRolePermissionsSchema = z.object({
+  id: z.number().positive().int().openapi({ example: 1 }),
+  menuIds: z.array(z.number().positive().int()).max(5000),
+  apiPermissionIds: z.array(z.number().positive().int()).max(5000),
+  homePageId: z.number().positive().int().nullable().openapi({ example: 2 }),
+});
+
+export const ApiPermissionSchema = z.object({
+  id: z.number().positive().int().optional(),
+  code: z.string().min(1).max(128),
+  name: z.string().min(1).max(128),
+  module: z.string().min(1).max(64),
+  method: z.string().min(1).max(16),
+  path: z.string().min(1).max(255),
+  description: z.string().max(255).optional(),
+  sort: z.coerce.number().int().optional(),
+  status: z.coerce.number().int().optional(),
+});
+
+export const CreateApiPermissionSchema = ApiPermissionSchema.omit({ id: true, status: true });
+
+export const UpdateApiPermissionSchema = ApiPermissionSchema.partial().extend({
+  id: z.number().positive().int(),
+});

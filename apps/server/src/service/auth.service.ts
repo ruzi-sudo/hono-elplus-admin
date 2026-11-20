@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { eq, and, ne, isNotNull, sql, asc } from "drizzle-orm";
+import { eq, and, ne, isNotNull, sql, asc, inArray } from "drizzle-orm";
 import {
   getAuth,
   getAuthEmail,
@@ -16,6 +16,8 @@ import {
   sysUsers,
   sysRoles,
   sysUserRoles,
+  sysApiPermissions,
+  sysRoleApiPermissions,
   sysPages,
   sysRolePages,
   sysOnlineUsers,
@@ -294,7 +296,7 @@ export async function login(
     .orderBy(asc(sysRoles.id))
     .limit(1);
 
-  const perms = await db
+  const buttonPerms = await db
     .selectDistinct({ auths: sysPages.auths })
     .from(sysPages)
     .innerJoin(sysRolePages, eq(sysPages.id, sysRolePages.pageId))
@@ -310,8 +312,24 @@ export async function login(
         sql`${sysPages.auths} != ''`,
       ),
     );
-
-  const permList = perms.map((p) => p.auths!).filter(Boolean);
+  const roleIds = roles.map((role) => role.id);
+  const apiPerms = roleIds.length
+    ? await db
+        .selectDistinct({ code: sysApiPermissions.code })
+        .from(sysRoleApiPermissions)
+        .innerJoin(
+          sysApiPermissions,
+          eq(sysRoleApiPermissions.apiPermissionId, sysApiPermissions.id),
+        )
+        .where(
+          and(
+            inArray(sysRoleApiPermissions.roleId, roleIds),
+            eq(sysApiPermissions.status, 1),
+          ),
+        )
+    : [];
+  const buttonPermissions = buttonPerms.map((p) => p.auths!).filter(Boolean);
+  const apiPermissions = apiPerms.map((p) => p.code);
 
   const accessToken = await issueBetterAuthSession(user, password, request);
   const refreshToken = accessToken;
@@ -415,8 +433,8 @@ export async function login(
     avatar: user.avatar || "",
     username: user.username,
     roles: roleCodes,
-    permissions: roleCodes.includes("admin") ? ["*:*:*"] : permList,
-    homePath: homePage?.path || "",
+    permissions: roleCodes.includes("admin") ? ["*:*:*"] : buttonPermissions,
+    apiPermissions: roleCodes.includes("admin") ? ["*"] : apiPermissions,
     accessToken,
     refreshToken,
     expires: formatExpires(
