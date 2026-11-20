@@ -323,7 +323,7 @@ VALUES
 ('api:role:update-api-permission', '修改接口权限', '角色管理', 'POST', '/role-api-permissions/update', 90),
 ('api:role:get-permissions', '查询角色权限', '角色管理', 'POST', '/role-permissions', 100),
 ('api:role:save-menu', '保存角色菜单', '角色管理', 'POST', '/role/save-menu', 110),
-('api:role:save-permissions', '保存角色权限', '角色管理', 'POST', '/role/save-permissions', 120),
+('api:role:save-api-permissions', '保存角色接口权限', '角色管理', 'POST', '/role/save-api-permissions', 120),
 ('api:menu:list', '查询菜单', '菜单管理', 'POST', '/menu', 10),
 ('api:menu:create', '创建菜单', '菜单管理', 'POST', '/menu/create', 20),
 ('api:menu:update', '修改菜单', '菜单管理', 'POST', '/menu/update', 30),
@@ -349,6 +349,21 @@ INSERT IGNORE INTO sys_role_api_permissions (role_id, api_permission_id)
 SELECT r.id, p.id
 FROM sys_roles r
 JOIN sys_api_permissions p ON r.code = 'admin';
+
+INSERT IGNORE INTO sys_role_api_permissions (role_id, api_permission_id)
+SELECT role_row.id, permission.id
+FROM sys_roles role_row
+JOIN sys_api_permissions permission
+  ON role_row.code = 'common'
+WHERE permission.code IN (
+  'api:menu:get-routes',
+  'api:dashboard:cards',
+  'api:dashboard:map',
+  'api:mine:get',
+  'api:mine:update',
+  'api:mine:reset-password',
+  'api:mine:upload-avatar'
+);
 
 INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, name, path, component, `rank`, icon, auths, status) VALUES
 (1, 0, 0, 'menus.pureHome', 'Home', '/', 'layout/index.vue', 0, 'ep/home-filled', NULL, 1),

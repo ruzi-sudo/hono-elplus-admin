@@ -132,6 +132,21 @@ docker/init.sql
 
 `docker/init.sql` 仅用于空数据卷首次初始化。已有数据库升级时，必须按文件名顺序执行 `docker/migrations/*.sql`，不要通过删除数据卷重新初始化。
 
+当前权限模型分为三层：
+
+- 页面权限：`sys_role_pages`，同时承载菜单和按钮权限。
+- 接口权限：`sys_api_permissions` 与 `sys_role_api_permissions`，由服务端路由中间件强制校验。
+- 角色首页：`sys_roles.home_page_id`，必须指向该角色已授权的启用页面。
+
+已有数据库升级到接口权限模型时，执行：
+
+```bash
+mysql -h 127.0.0.1 -P 3308 -u root -p hono_elplus_admin \
+  < docker/migrations/20261120_add_api_permissions.sql
+```
+
+角色菜单和接口权限保存是两个独立操作；保存其中一类权限不会覆盖另一类权限。
+
 该文件包含：
 
 - 用户表
@@ -139,6 +154,7 @@ docker/init.sql
 - 用户角色关联表
 - 菜单表
 - 角色菜单关联表
+- 角色接口权限关联表
 - 在线用户表
 - 登录日志表
 - 系统日志表
