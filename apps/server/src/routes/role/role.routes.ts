@@ -164,15 +164,15 @@ export const listApiPermissions = createRoute({
   },
 });
 
-export const getRolePermissions = createRoute({
+export const getRoleApiPermissionIds = createRoute({
   method: "post",
-  path: "/role-permissions",
+  path: "/role-api-permission-ids",
   tags: ["role"],
   request: {
     body: { content: { "application/json": { schema: RoleMenuIdsSchema } } },
   },
   responses: {
-    "200": { description: "角色权限" },
+    "200": { description: "角色已分配的接口权限ID" },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

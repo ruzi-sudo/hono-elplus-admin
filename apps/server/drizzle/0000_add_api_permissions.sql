@@ -40,6 +40,7 @@ CREATE INDEX `idx_role_api_permissions_api_id` ON `sys_role_api_permissions` (`a
 INSERT INTO `sys_api_permissions`
   (`code`, `name`, `module`, `method`, `path`, `sort`)
 VALUES
+  ('api:auth:logout', '退出登录', '认证', 'POST', '/logout', 10),
   ('api:user:list', '查询用户', '用户管理', 'POST', '/user', 10),
   ('api:user:create', '创建用户', '用户管理', 'POST', '/user/create', 20),
   ('api:user:update', '修改用户', '用户管理', 'POST', '/user/update', 30),
@@ -58,9 +59,8 @@ VALUES
   ('api:role:list-api-permissions', '查询接口权限', '角色管理', 'GET', '/role-api-permissions', 70),
   ('api:role:create-api-permission', '新增接口权限', '角色管理', 'POST', '/role-api-permissions/create', 80),
   ('api:role:update-api-permission', '修改接口权限', '角色管理', 'POST', '/role-api-permissions/update', 90),
-  ('api:role:get-permissions', '查询角色权限', '角色管理', 'POST', '/role-permissions', 100),
   ('api:role:save-menu', '保存角色菜单', '角色管理', 'POST', '/role/save-menu', 110),
-  ('api:role:save-permissions', '保存角色权限', '角色管理', 'POST', '/role/save-permissions', 120),
+  ('api:role:save-api-permissions', '保存角色接口权限', '角色管理', 'POST', '/role/save-api-permissions', 120),
   ('api:menu:list', '查询菜单', '菜单管理', 'POST', '/menu', 10),
   ('api:menu:create', '创建菜单', '菜单管理', 'POST', '/menu/create', 20),
   ('api:menu:update', '修改菜单', '菜单管理', 'POST', '/menu/update', 30),
@@ -86,3 +86,18 @@ INSERT INTO `sys_role_api_permissions` (`role_id`, `api_permission_id`)
 SELECT r.id, p.id
 FROM `sys_roles` r
 JOIN `sys_api_permissions` p ON r.code = 'admin';
+--> statement-breakpoint
+INSERT INTO `sys_role_api_permissions` (`role_id`, `api_permission_id`)
+SELECT r.id, p.id
+FROM `sys_roles` r
+JOIN `sys_api_permissions` p ON r.code = 'common'
+WHERE p.code IN (
+  'api:auth:logout',
+  'api:menu:get-routes',
+  'api:dashboard:cards',
+  'api:dashboard:map',
+  'api:mine:get',
+  'api:mine:update',
+  'api:mine:reset-password',
+  'api:mine:upload-avatar'
+);

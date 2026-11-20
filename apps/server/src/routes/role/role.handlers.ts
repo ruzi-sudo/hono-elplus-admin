@@ -94,9 +94,9 @@ route.openapi(routes.listApiPermissions, async (c) => {
   return c.json({ code: 0, message: "操作成功", data });
 });
 
-route.openapi(routes.getRolePermissions, async (c) => {
+route.openapi(routes.getRoleApiPermissionIds, async (c) => {
   const body = c.req.valid("json");
-  const data = await roleService.getRolePermissions(body.id);
+  const data = await roleService.getRoleApiPermissionIds(body.id);
   return c.json({ code: 0, message: "操作成功", data });
 });
 
@@ -164,6 +164,6 @@ route.openapi(routes.roleMenu, async (c) => {
 
 route.openapi(routes.roleMenuIds, async (c) => {
   const body = c.req.valid("json");
-  const data = await roleService.getRolePermission(body.id);
+  const data = await roleService.getRoleMenuIds(body.id);
   return c.json({ code: 0, message: "操作成功", data });
 });

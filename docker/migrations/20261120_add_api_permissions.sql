@@ -142,6 +142,7 @@ DEALLOCATE PREPARE add_api_index_stmt;
 INSERT INTO sys_api_permissions
     (code, name, module, method, path, status, sort)
 VALUES
+('api:auth:logout', '退出登录', '认证', 'POST', '/logout', 1, 10),
 ('api:user:list', '查询用户', '用户管理', 'POST', '/user', 1, 10),
 ('api:user:create', '创建用户', '用户管理', 'POST', '/user/create', 1, 20),
 ('api:user:update', '修改用户', '用户管理', 'POST', '/user/update', 1, 30),
@@ -160,7 +161,6 @@ VALUES
 ('api:role:list-api-permissions', '查询接口权限', '角色管理', 'GET', '/role-api-permissions', 1, 70),
 ('api:role:create-api-permission', '新增接口权限', '角色管理', 'POST', '/role-api-permissions/create', 1, 80),
 ('api:role:update-api-permission', '修改接口权限', '角色管理', 'POST', '/role-api-permissions/update', 1, 90),
-('api:role:get-permissions', '查询角色权限', '角色管理', 'POST', '/role-permissions', 1, 100),
 ('api:role:save-menu', '保存角色菜单', '角色管理', 'POST', '/role/save-menu', 1, 110),
 ('api:role:save-api-permissions', '保存角色接口权限', '角色管理', 'POST', '/role/save-api-permissions', 1, 120),
 ('api:menu:list', '查询菜单', '菜单管理', 'POST', '/menu', 1, 10),
@@ -192,14 +192,6 @@ ON DUPLICATE KEY UPDATE
     sort = VALUES(sort),
     updated_at = CURRENT_TIMESTAMP;
 
-DELETE role_permission
-FROM sys_role_api_permissions role_permission
-INNER JOIN sys_api_permissions permission
-  ON permission.id = role_permission.api_permission_id
-WHERE permission.code = 'api:role:save-permissions';
-DELETE FROM sys_api_permissions
-WHERE code = 'api:role:save-permissions';
-
 INSERT IGNORE INTO sys_role_api_permissions (role_id, api_permission_id)
 SELECT role_row.id, permission.id
 FROM sys_roles role_row
@@ -212,6 +204,7 @@ FROM sys_roles role_row
 JOIN sys_api_permissions permission
   ON role_row.code = 'common'
 WHERE permission.code IN (
+  'api:auth:logout',
   'api:menu:get-routes',
   'api:dashboard:cards',
   'api:dashboard:map',

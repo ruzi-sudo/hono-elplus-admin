@@ -85,7 +85,7 @@ app.use("/role/*", systemLogMiddleware);
 app.use("/role-menu", authMiddleware);
 app.use("/role-menu-ids", authMiddleware);
 app.use("/role-api-permissions", authMiddleware);
-app.use("/role-permissions", authMiddleware);
+app.use("/role-api-permission-ids", authMiddleware);
 app.use("/role", requirePageAccess("SystemRole"));
 app.use("/role", requireApiPermission());
 app.use(
@@ -116,7 +116,7 @@ app.use(
   requireApiPermission(),
 );
 app.use(
-  "/role-permissions",
+  "/role-api-permission-ids",
   requirePageAccess("SystemRole"),
   requireApiPermission(),
 );
@@ -160,7 +160,7 @@ app.use("/online-logs/force-offline", authMiddleware);
 app.use("/login-logs/*", authMiddleware);
 app.use("/system-logs/*", authMiddleware);
 app.use("/system-logs-detail", authMiddleware);
-app.use("/logout", authMiddleware);
+app.use("/logout", authMiddleware, requireApiPermission());
 app.use("/online-logs", requirePageAccess("OnlineUser"));
 app.use(
   "/online-logs",

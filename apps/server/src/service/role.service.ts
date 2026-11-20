@@ -31,8 +31,16 @@ async function getUserApiPermissionIds(userId: number): Promise<Set<number>> {
     .from(sysRoleApiPermissions)
     .innerJoin(sysUserRoles, eq(sysRoleApiPermissions.roleId, sysUserRoles.roleId))
     .innerJoin(sysRoles, eq(sysRoleApiPermissions.roleId, sysRoles.id))
+    .innerJoin(
+      sysApiPermissions,
+      eq(sysRoleApiPermissions.apiPermissionId, sysApiPermissions.id),
+    )
     .where(
-      and(eq(sysUserRoles.userId, userId), eq(sysRoles.status, 1)),
+      and(
+        eq(sysUserRoles.userId, userId),
+        eq(sysRoles.status, 1),
+        eq(sysApiPermissions.status, 1),
+      ),
     );
   return new Set(rows.map((row) => row.apiPermissionId));
 }
@@ -107,16 +115,34 @@ export async function assertRolesAssignable(
     throw new ForbiddenException("无权分配系统内置角色");
   }
 
-  const [targetPageRows, allowedPageIds] = await Promise.all([
+  const [
+    targetPageRows,
+    allowedPageIds,
+    targetApiPermissionRows,
+    allowedApiPermissionIds,
+  ] = await Promise.all([
     db
       .select({ pageId: sysRolePages.pageId })
       .from(sysRolePages)
       .where(inArray(sysRolePages.roleId, uniqueRoleIds)),
     getUserPageIds(user.userId),
+    db
+      .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
+      .from(sysRoleApiPermissions)
+      .where(inArray(sysRoleApiPermissions.roleId, uniqueRoleIds)),
+    getUserApiPermissionIds(user.userId),
   ]);
 
   if (targetPageRows.some((row) => !allowedPageIds.has(row.pageId))) {
-    throw new ForbiddenException("只能分配自身已有权限范围内的角色");
+    throw new ForbiddenException("只能分配自身已有页面权限范围内的角色");
+  }
+
+  if (
+    targetApiPermissionRows.some(
+      (row) => !allowedApiPermissionIds.has(row.apiPermissionId),
+    )
+  ) {
+    throw new ForbiddenException("只能分配自身已有接口权限范围内的角色");
   }
 }
 
@@ -195,7 +221,7 @@ export async function updateApiPermission(input: {
     .where(eq(sysApiPermissions.id, input.id));
 }
 
-export async function getRolePermissions(roleId: number) {
+export async function getRoleMenuIds(roleId: number) {
   const db = await getDb();
   const [role] = await db
     .select({ homePageId: sysRoles.homePageId })
@@ -203,28 +229,6 @@ export async function getRolePermissions(roleId: number) {
     .where(eq(sysRoles.id, roleId))
     .limit(1);
   if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
-
-  const [menuRows, apiRows] = await Promise.all([
-    db.select({ pageId: sysRolePages.pageId }).from(sysRolePages).where(eq(sysRolePages.roleId, roleId)),
-    db.select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId }).from(sysRoleApiPermissions).where(eq(sysRoleApiPermissions.roleId, roleId)),
-  ]);
-  return {
-    menuIds: menuRows.map((row) => row.pageId),
-    apiPermissionIds: apiRows.map((row) => row.apiPermissionId),
-    homePageId: role.homePageId ?? null,
-  };
-}
-
-export async function getRolePermission(roleId: number) {
-  const db = await getDb();
-  const [role] = await db
-    .select({ homePageId: sysRoles.homePageId })
-    .from(sysRoles)
-    .where(eq(sysRoles.id, roleId))
-    .limit(1);
-  if (!role) {
-    throw { code: 10003, message: "角色不存在", status: 404 };
-  }
 
   const rows = await db
     .select({ pageId: sysRolePages.pageId })
@@ -235,6 +239,23 @@ export async function getRolePermission(roleId: number) {
     menuIds: rows.map((row) => row.pageId),
     homePageId: role.homePageId ?? null,
   };
+}
+
+export async function getRoleApiPermissionIds(roleId: number) {
+  const db = await getDb();
+  const [role] = await db
+    .select({ id: sysRoles.id })
+    .from(sysRoles)
+    .where(eq(sysRoles.id, roleId))
+    .limit(1);
+  if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
+
+  const rows = await db
+    .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
+    .from(sysRoleApiPermissions)
+    .where(eq(sysRoleApiPermissions.roleId, roleId));
+
+  return { apiPermissionIds: rows.map((row) => row.apiPermissionId) };
 }
 
 export async function listRoles(params: {
