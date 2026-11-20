@@ -192,6 +192,20 @@ ON DUPLICATE KEY UPDATE
     sort = VALUES(sort),
     updated_at = CURRENT_TIMESTAMP;
 
+DELETE role_permission
+FROM sys_role_api_permissions role_permission
+INNER JOIN sys_api_permissions permission
+  ON permission.id = role_permission.api_permission_id
+WHERE permission.code IN (
+    'api:role:get-permissions',
+    'api:role:save-permissions'
+);
+DELETE FROM sys_api_permissions
+WHERE code IN (
+    'api:role:get-permissions',
+    'api:role:save-permissions'
+);
+
 INSERT IGNORE INTO sys_role_api_permissions (role_id, api_permission_id)
 SELECT role_row.id, permission.id
 FROM sys_roles role_row

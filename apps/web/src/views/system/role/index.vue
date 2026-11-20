@@ -347,6 +347,7 @@ onMounted(() => {
                 <span>{{ transformI18n(node.label) }}</span>
               </template>
             </el-tree-v2>
+          </el-tab-pane>
           <el-tab-pane label="独立接口权限" name="api">
             <div class="flex gap-2 mb-2">
               <el-tag type="info">
