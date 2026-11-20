@@ -1,9 +1,9 @@
 import { http } from "@/utils/http";
 
-type Result = {
+type Result<T = unknown> = {
   code: number;
   message: string;
-  data?: Array<any>;
+  data?: T;
 };
 
 type ResultTable = {
@@ -26,8 +26,21 @@ type RolePermissionResult = {
   message: string;
   data?: {
     menuIds: number[];
+    apiPermissionIds: number[];
     homePageId: number | null;
   };
+};
+
+export type ApiPermission = {
+  id: number;
+  code: string;
+  name: string;
+  module: string;
+  method: string;
+  path: string;
+  description?: string | null;
+  sort?: number | null;
+  status?: number | null;
 };
 
 /** 获取系统管理-用户管理列表 */
@@ -95,6 +108,26 @@ export const deleteRole = (data?: object) => {
 /** 保存角色菜单权限 */
 export const saveRoleMenu = (data?: object) => {
   return http.request<Result>("post", "/api/role/save-menu", { data });
+};
+
+export const listApiPermissions = () => {
+  return http.request<Result<ApiPermission[]>>("get", "/api/role-api-permissions");
+};
+
+export const createApiPermission = (data?: object) => {
+  return http.request<Result>("post", "/api/role-api-permissions/create", { data });
+};
+
+export const updateApiPermission = (data?: object) => {
+  return http.request<Result>("post", "/api/role-api-permissions/update", { data });
+};
+
+export const saveRolePermissions = (data?: object) => {
+  return http.request<Result>("post", "/api/role/save-permissions", { data });
+};
+
+export const getRolePermissions = (data?: object) => {
+  return http.request<RolePermissionResult>("post", "/api/role-permissions", { data });
 };
 
 /** 获取系统管理-菜单管理列表 */

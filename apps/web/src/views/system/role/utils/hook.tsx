@@ -12,11 +12,14 @@ import { getKeyList, deviceDetection } from "@pureadmin/utils";
 import {
   getRoleList,
   getRoleMenu,
-  getRoleMenuIds,
+  getRolePermissions,
+  listApiPermissions,
+  createApiPermission,
+  updateApiPermission,
   createRole,
   updateRole,
   deleteRole,
-  saveRoleMenu,
+  saveRolePermissions,
 } from "@/api/system";
 import {
   type Ref,
@@ -29,6 +32,18 @@ import {
   watch,
 } from "vue";
 
+type ApiPermissionItem = {
+  id: number;
+  code: string;
+  name: string;
+  module: string;
+  method: string;
+  path: string;
+  description?: string | null;
+  sort?: number | null;
+  status?: number | null;
+};
+
 type RoleMenuItem = {
   id: number;
   menuType: number;
@@ -37,7 +52,6 @@ type RoleMenuItem = {
   component: string;
   status: number;
 };
-
 export function useRole(treeRef: Ref) {
   const form = reactive({
     name: "",
@@ -52,6 +66,19 @@ export function useRole(treeRef: Ref) {
   const menuPages = ref<RoleMenuItem[]>([]);
   const checkedMenuIds = ref<number[]>([]);
   const homePageId = ref<number | null>(null);
+  const checkedApiPermissionIds = ref<number[]>([]);
+  const apiPermissionData = ref<ApiPermissionItem[]>([]);
+  const apiPermissionForm = reactive({
+    id: 0,
+    code: "",
+    name: "",
+    module: "",
+    method: "GET",
+    path: "",
+    description: "",
+    sort: 0,
+    status: 1,
+  });
   const activePermissionTab = ref("menu");
   const isShow = ref(false);
   const loading = ref(true);
@@ -266,24 +293,38 @@ export function useRole(treeRef: Ref) {
   }
 
   /** 菜单权限 */
-  async function handleMenu(row?: any) {
-    const { id } = row;
+  async function handleMenu(row?: { id?: number; name?: string }) {
+    const { id } = row ?? {};
     if (id) {
       curRow.value = row;
       isShow.value = true;
       activePermissionTab.value = "menu";
-      const { code, data } = await getRoleMenuIds({ id });
+      const [{ code, data }, apiResult] = await Promise.all([
+        getRolePermissions({ id }),
+        listApiPermissions(),
+      ]);
       if (code === 0 && data) {
         treeRef.value.setCheckedKeys(data.menuIds);
         checkedMenuIds.value = data.menuIds;
+        checkedApiPermissionIds.value = data.apiPermissionIds;
         homePageId.value = data.homePageId;
+      }
+      if (apiResult.code === 0 && Array.isArray(apiResult.data)) {
+        apiPermissionData.value = apiResult.data;
       }
     } else {
       curRow.value = null;
       isShow.value = false;
       checkedMenuIds.value = [];
+      checkedApiPermissionIds.value = [];
       homePageId.value = null;
     }
+  }
+
+  function toggleApiPermission(id: number) {
+    checkedApiPermissionIds.value = checkedApiPermissionIds.value.includes(id)
+      ? checkedApiPermissionIds.value.filter((value) => value !== id)
+      : [...checkedApiPermissionIds.value, id];
   }
 
   function handleTreeCheck(_node, { checkedKeys }) {
@@ -304,17 +345,17 @@ export function useRole(treeRef: Ref) {
     };
   }
 
-  /** 菜单权限-保存 */
   async function handleSave() {
     const { id, name } = curRow.value;
     const menuIds = treeRef.value.getCheckedKeys() as number[];
-    const { code, message: msg } = await saveRoleMenu({
+    const { code, message: msg } = await saveRolePermissions({
       id,
       menuIds,
+      apiPermissionIds: checkedApiPermissionIds.value,
       homePageId: homePageId.value,
     });
     if (code === 0) {
-      message(`角色 ${name} 的菜单权限修改成功`, { type: "success" });
+      message(`角色 ${name} 的权限修改成功`, { type: "success" });
     } else {
       message(msg || "保存失败", { type: "error" });
     }
@@ -373,6 +414,10 @@ export function useRole(treeRef: Ref) {
     treeProps,
     homePageId,
     homePageOptions,
+    checkedApiPermissionIds,
+    apiPermissionData,
+    apiPermissionForm,
+    toggleApiPermission,
     activePermissionTab,
     isLinkage,
     pagination,

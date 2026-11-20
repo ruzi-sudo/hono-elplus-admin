@@ -28,7 +28,7 @@ const canAssignRoles = hasPerms("system-user:assign-role");
 onMounted(async () => {
   if (!canAssignRoles) return;
   const { data } = await getAllRoleList();
-  roleOptions.value = data ?? [];
+  roleOptions.value = Array.isArray(data) ? data : [];
 });
 
 function getRef() {

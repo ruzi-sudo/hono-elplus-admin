@@ -19,6 +19,8 @@ export interface DataInfo<T> {
   roles?: Array<string>;
   /** 当前登录用户的按钮级别权限 */
   permissions?: Array<string>;
+  /** 当前登录用户的接口级别权限 */
+  apiPermissions?: Array<string>;
 }
 
 export const userKey = "user-info";
@@ -68,12 +70,13 @@ export function setToken(data: DataInfo<Date>) {
       : {},
   );
 
-  function setUserKey({ avatar, username, nickname, roles, permissions }) {
+  function setUserKey({ avatar, username, nickname, roles, permissions, apiPermissions }) {
     useUserStoreHook().SET_AVATAR(avatar);
     useUserStoreHook().SET_USERNAME(username);
     useUserStoreHook().SET_NICKNAME(nickname);
     useUserStoreHook().SET_ROLES(roles);
     useUserStoreHook().SET_PERMS(permissions);
+    useUserStoreHook().SET_API_PERMS(apiPermissions);
     storageLocal().setItem(userKey, {
       refreshToken,
       expires,
@@ -82,6 +85,7 @@ export function setToken(data: DataInfo<Date>) {
       nickname,
       roles,
       permissions,
+      apiPermissions,
     });
   }
 
@@ -93,6 +97,7 @@ export function setToken(data: DataInfo<Date>) {
       nickname: data?.nickname ?? "",
       roles,
       permissions: data?.permissions ?? [],
+      apiPermissions: data?.apiPermissions ?? [],
     });
   } else {
     const avatar =
@@ -105,12 +110,15 @@ export function setToken(data: DataInfo<Date>) {
       storageLocal().getItem<DataInfo<number>>(userKey)?.roles ?? [];
     const permissions =
       storageLocal().getItem<DataInfo<number>>(userKey)?.permissions ?? [];
+    const apiPermissions =
+      storageLocal().getItem<DataInfo<number>>(userKey)?.apiPermissions ?? [];
     setUserKey({
       avatar,
       username,
       nickname,
       roles,
       permissions,
+      apiPermissions,
     });
   }
 }

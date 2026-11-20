@@ -9,9 +9,10 @@ export type UserResult = {
     /** 用户名 */
     username: string;
     /** 当前登录用户的角色 */
-    roles: Array<string>;
     /** 按钮级别权限 */
     permissions: Array<string>;
+    /** 接口级别权限 */
+    apiPermissions: Array<string>;
     /** 角色登录首页 */
     homePath: string;
     /** `token` */

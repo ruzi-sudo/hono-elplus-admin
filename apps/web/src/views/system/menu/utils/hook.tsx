@@ -57,8 +57,8 @@ export function useMenu() {
   });
 
   const formRef = ref();
-  const dataList = ref([]);
-  const flatMenuList = ref([]);
+  const dataList = ref<any[]>([]);
+  const flatMenuList = ref<any[]>([]);
   const loading = ref(true);
   const switchLoadMap = ref<Record<number, { loading: boolean }>>({});
   const { switchStyle } = usePublicHooks();
@@ -165,12 +165,13 @@ export function useMenu() {
     loading.value = true;
     const { code, data } = await getMenuList(); // 这里是返回一维数组结构，前端自行处理成树结构，返回格式要求：唯一id加父节点parentId，parentId取父节点id
     if (code === 0) {
-      flatMenuList.value = data;
-      let newData = data;
+      const menuData = Array.isArray(data) ? data : [];
+      flatMenuList.value = menuData;
+      let newData = menuData;
       if (!isAllEmpty(form.title)) {
         newData = filterMenusWithAncestors(newData, form.title);
       }
-      dataList.value = handleTree(newData); // 处理成树结构
+      dataList.value = handleTree(newData);
     }
 
     setTimeout(() => {
