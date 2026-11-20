@@ -38,7 +38,7 @@
 - Drizzle ORM
 - MySQL
 - Redis
-- JWT Access Token / Refresh Token
+- Better Auth Session Token（Bearer 认证）
 - OpenAPI / Scalar API Reference
 
 ### 工程结构
@@ -118,7 +118,7 @@ pnpm dev
 
 ## 环境配置
 
-本地开发优先读取根目录 `.env.dev`，不存在时回退到 `.env`。后端会从该文件读取数据库、Redis、JWT 等配置；Shell 或容器显式传入的环境变量优先级更高。
+本地开发优先读取根目录 `.env.dev`，不存在时回退到 `.env`。后端会从该文件读取数据库、Redis、JWT 和 Better Auth 密钥等配置；Shell 或容器显式传入的环境变量优先级更高。可从 `.env.example` 复制配置模板，`BETTER_AUTH_SECRET` 必须替换为至少 32 个字符的随机密钥。Better Auth 服务地址会根据当前请求动态生成，无需单独配置。
 
 本地开发时需要确认 MySQL 和 Redis 配置与 `docker/docker-compose.yml` 保持一致。
 
@@ -129,6 +129,8 @@ pnpm dev
 ```text
 docker/init.sql
 ```
+
+`docker/init.sql` 仅用于空数据卷首次初始化。已有数据库升级时，必须按文件名顺序执行 `docker/migrations/*.sql`，不要通过删除数据卷重新初始化。
 
 该文件包含：
 
