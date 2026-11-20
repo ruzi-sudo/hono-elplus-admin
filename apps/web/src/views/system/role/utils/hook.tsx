@@ -12,7 +12,8 @@ import { getKeyList, deviceDetection } from "@pureadmin/utils";
 import {
   getRoleList,
   getRoleMenu,
-  getRolePermissions,
+  getRoleMenuIds,
+  getRoleApiPermissionIds,
   listApiPermissions,
   createApiPermission,
   updateApiPermission,
@@ -293,25 +294,29 @@ export function useRole(treeRef: Ref) {
     });
   }
 
-  /** 菜单权限 */
+  /** 页面和按钮权限、接口权限分别读取和保存。 */
   async function handleMenu(row?: { id?: number; name?: string }) {
     const { id } = row ?? {};
     if (id) {
       curRow.value = row;
       isShow.value = true;
       activePermissionTab.value = "menu";
-      const [{ code, data }, apiResult] = await Promise.all([
-        getRolePermissions({ id }),
-        listApiPermissions(),
-      ]);
-      if (code === 0 && data) {
-        treeRef.value.setCheckedKeys(data.menuIds);
-        checkedMenuIds.value = data.menuIds;
-        checkedApiPermissionIds.value = data.apiPermissionIds;
-        homePageId.value = data.homePageId;
+      const [{ code: menuCode, data: menuData }, apiResult, permissionResult] =
+        await Promise.all([
+          getRoleMenuIds({ id }),
+          getRoleApiPermissionIds({ id }),
+          listApiPermissions(),
+        ]);
+      if (menuCode === 0 && menuData) {
+        treeRef.value.setCheckedKeys(menuData.menuIds);
+        checkedMenuIds.value = menuData.menuIds;
+        homePageId.value = menuData.homePageId;
       }
-      if (apiResult.code === 0 && Array.isArray(apiResult.data)) {
-        apiPermissionData.value = apiResult.data;
+      if (apiResult.code === 0 && apiResult.data) {
+        checkedApiPermissionIds.value = apiResult.data.apiPermissionIds;
+      }
+      if (permissionResult.code === 0 && Array.isArray(permissionResult.data)) {
+        apiPermissionData.value = permissionResult.data;
       }
     } else {
       curRow.value = null;

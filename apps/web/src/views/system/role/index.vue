@@ -315,12 +315,12 @@ onMounted(() => {
             </Auth>
           </div>
           <p class="font-bold truncate">
-            权限配置
+            权限配置（页面/按钮与接口分开保存）
             {{ `${curRow?.name ? `（${curRow.name}）` : ""}` }}
           </p>
         </div>
         <el-tabs v-model="activePermissionTab" stretch>
-          <el-tab-pane label="菜单权限" name="menu">
+          <el-tab-pane label="页面与按钮权限" name="menu">
             <el-input
               v-model="treeSearchValue"
               placeholder="请输入菜单进行搜索"
@@ -347,7 +347,7 @@ onMounted(() => {
                 <span>{{ transformI18n(node.label) }}</span>
               </template>
             </el-tree-v2>
-          <el-tab-pane label="接口权限" name="api">
+          <el-tab-pane label="独立接口权限" name="api">
             <div class="flex gap-2 mb-2">
               <el-tag type="info">
                 已选择 {{ checkedApiPermissionIds.length }} 项
