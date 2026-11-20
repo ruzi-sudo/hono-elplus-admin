@@ -4,7 +4,7 @@ import {
   RoleMenuIdsSchema,
   SaveRoleMenuSchema,
 } from "./role.schemas";
-import { ErrorResponseSchema } from "../../common/schemas";
+import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
 
 export const listRoles = createRoute({
   method: "post",
@@ -19,6 +19,7 @@ export const listRoles = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -46,6 +47,7 @@ export const createRole = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -74,6 +76,7 @@ export const updateRole = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -92,6 +95,7 @@ export const deleteRole = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -108,6 +112,7 @@ export const saveRoleMenu = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -121,6 +126,7 @@ export const roleMenu = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });
 
@@ -137,5 +143,6 @@ export const roleMenuIds = createRoute({
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
+    "403": ForbiddenResponse,
   },
 });

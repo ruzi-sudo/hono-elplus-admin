@@ -8,6 +8,71 @@ import {
   sysUsers,
   sysPages,
 } from "../db/schema";
+import { ForbiddenException, ParamsException } from "../common/exception";
+import type { AuthenticatedUser } from "../middlewares/auth";
+
+const PROTECTED_ROLE_CODES = new Set(["admin", "common"]);
+
+function isSystemAdmin(user: AuthenticatedUser): boolean {
+  return user.roles.includes("admin");
+}
+
+function assertMutableRole(code: string): void {
+  if (PROTECTED_ROLE_CODES.has(code)) {
+    throw new ParamsException("系统内置角色不允许修改");
+  }
+}
+
+async function getUserPageIds(userId: number): Promise<Set<number>> {
+  const db = await getDb();
+  const rows = await db
+    .select({ pageId: sysRolePages.pageId })
+    .from(sysRolePages)
+    .innerJoin(sysUserRoles, eq(sysRolePages.roleId, sysUserRoles.roleId))
+    .innerJoin(sysRoles, eq(sysRolePages.roleId, sysRoles.id))
+    .innerJoin(sysPages, eq(sysRolePages.pageId, sysPages.id))
+    .where(
+      and(
+        eq(sysUserRoles.userId, userId),
+        eq(sysRoles.status, 1),
+        eq(sysPages.status, 1),
+      ),
+    );
+  return new Set(rows.map((row) => row.pageId));
+}
+
+export async function assertRolesAssignable(
+  user: AuthenticatedUser,
+  roleIds: number[],
+): Promise<void> {
+  const uniqueRoleIds = [...new Set(roleIds)];
+  if (uniqueRoleIds.length === 0) return;
+
+  const db = await getDb();
+  const roles = await db
+    .select({ id: sysRoles.id, code: sysRoles.code })
+    .from(sysRoles)
+    .where(inArray(sysRoles.id, uniqueRoleIds));
+  if (roles.length !== uniqueRoleIds.length) {
+    throw new ParamsException("角色不存在");
+  }
+  if (isSystemAdmin(user)) return;
+  if (roles.some((role) => PROTECTED_ROLE_CODES.has(role.code))) {
+    throw new ForbiddenException("无权分配系统内置角色");
+  }
+
+  const [targetPageRows, allowedPageIds] = await Promise.all([
+    db
+      .select({ pageId: sysRolePages.pageId })
+      .from(sysRolePages)
+      .where(inArray(sysRolePages.roleId, uniqueRoleIds)),
+    getUserPageIds(user.userId),
+  ]);
+
+  if (targetPageRows.some((row) => !allowedPageIds.has(row.pageId))) {
+    throw new ForbiddenException("只能分配自身已有权限范围内的角色");
+  }
+}
 
 export async function listAllRoles() {
   const db = await getDb();
@@ -113,8 +178,12 @@ export async function createRole(params: {
 }) {
   const db = await getDb();
 
+  if (PROTECTED_ROLE_CODES.has(params.code)) {
+    throw new ParamsException("角色标识为系统保留值");
+  }
+
   const [existing] = await db
-    .select({ id: sysRoles.id })
+    .select({ id: sysRoles.id, code: sysRoles.code })
     .from(sysRoles)
     .where(eq(sysRoles.code, params.code))
     .limit(1);
@@ -142,12 +211,28 @@ export async function updateRole(params: {
   const db = await getDb();
 
   const [existing] = await db
-    .select({ id: sysRoles.id })
+    .select({ id: sysRoles.id, code: sysRoles.code })
     .from(sysRoles)
     .where(eq(sysRoles.id, params.id))
     .limit(1);
   if (!existing) {
     throw { code: 10003, message: "角色不存在", status: 404 };
+  }
+
+  assertMutableRole(existing.code);
+
+  if (params.code !== undefined && params.code !== existing.code) {
+    if (PROTECTED_ROLE_CODES.has(params.code)) {
+      throw new ParamsException("角色标识为系统保留值");
+    }
+    const [sameCode] = await db
+      .select({ id: sysRoles.id })
+      .from(sysRoles)
+      .where(eq(sysRoles.code, params.code))
+      .limit(1);
+    if (sameCode && sameCode.id !== params.id) {
+      throw new ParamsException("角色标识已存在");
+    }
   }
 
   const updateData: Record<string, any> = {};
@@ -166,13 +251,15 @@ export async function deleteRole(id: number) {
   const db = await getDb();
 
   const [existing] = await db
-    .select({ id: sysRoles.id })
+    .select({ id: sysRoles.id, code: sysRoles.code })
     .from(sysRoles)
     .where(eq(sysRoles.id, id))
     .limit(1);
   if (!existing) {
     throw { code: 10003, message: "角色不存在", status: 404 };
   }
+
+  assertMutableRole(existing.code);
 
   // 先删除角色关联的权限和用户关系
   await db.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
@@ -212,17 +299,27 @@ export async function saveRoleMenu(
   id: number,
   menuIds: number[],
   homePageId: number | null,
+  user: AuthenticatedUser,
 ) {
   const db = await getDb();
   const uniqueMenuIds = [...new Set(menuIds)];
 
   const [role] = await db
-    .select({ id: sysRoles.id })
+    .select({ id: sysRoles.id, code: sysRoles.code })
     .from(sysRoles)
     .where(eq(sysRoles.id, id))
     .limit(1);
   if (!role) {
     throw { code: 10003, message: "角色不存在", status: 404 };
+  }
+
+  assertMutableRole(role.code);
+
+  if (!isSystemAdmin(user)) {
+    const allowedPageIds = await getUserPageIds(user.userId);
+    if (uniqueMenuIds.some((pageId) => !allowedPageIds.has(pageId))) {
+      throw new ForbiddenException("只能配置自身已有权限范围内的菜单");
+    }
   }
 
   if (uniqueMenuIds.length > 0) {

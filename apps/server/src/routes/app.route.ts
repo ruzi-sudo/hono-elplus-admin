@@ -10,6 +10,7 @@ import { route as dashboardRoute } from "./dashboard/dashboard.handlers";
 import { authMiddleware } from "../middlewares/auth";
 import { requirePageAccess, requirePermission } from "../middlewares/rbac";
 import { systemLogMiddleware } from "../middlewares/systemLog";
+import { avatarUploadLimitMiddleware } from "../middlewares/uploadLimit";
 import { errorHandler } from "../middlewares/error";
 import { setupOpenapi } from "../common/openapi";
 
@@ -35,6 +36,7 @@ app.use("/user/*", systemLogMiddleware);
 app.use("/list-all-role", authMiddleware);
 app.use("/list-role-ids", authMiddleware);
 app.use("/upload/*", authMiddleware);
+app.use("/upload/avatar", avatarUploadLimitMiddleware);
 app.use("/user", requirePageAccess("SystemUser"));
 app.use("/user/create", requirePermission("system-user:add"));
 app.use("/user/update", requirePermission("system-user:edit"));
@@ -73,18 +75,6 @@ app.use("/menu/*", authMiddleware);
 app.use("/menu/*", systemLogMiddleware);
 app.use("/get-async-routes", authMiddleware);
 app.use("/menu", requirePageAccess("SystemMenu"));
-app.use(
-  "/menu/create",
-  requirePermission(async (c) => {
-    const body = (await c.req.raw
-      .clone()
-      .json()
-      .catch(() => ({}))) as { parentId?: number };
-    return Number(body.parentId) > 0
-      ? "system-menu:add-child"
-      : "system-menu:add";
-  }),
-);
 app.use("/menu/update", requirePermission("system-menu:edit"));
 app.use("/menu/delete", requirePermission("system-menu:delete"));
 app.route("/", menuRoute);
@@ -112,6 +102,7 @@ app.route("/", monitorRoute);
 
 // Protected routes - dashboard
 app.use("/mine/*", authMiddleware);
+app.use("/mine/upload/avatar", avatarUploadLimitMiddleware);
 app.use("/mine/*", systemLogMiddleware);
 app.use("/get-card-list", authMiddleware);
 app.use("/get-map-info", authMiddleware);

@@ -4,7 +4,10 @@ import { validatorParamsHook } from "../../common/validator";
 import * as routes from "./user.routes";
 import * as userService from "../../service/user.service";
 import * as roleService from "../../service/role.service";
+import * as authService from "../../service/auth.service";
 import { saveAvatar } from "../../service/upload.service";
+import { getAuthenticatedUser } from "../../middlewares/auth";
+import { assertPermission } from "../../middlewares/rbac";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -33,6 +36,11 @@ route.openapi(routes.createUser, async (c) => {
     remark?: string;
   };
   try {
+    if (body.roleIds !== undefined) {
+      const user = getAuthenticatedUser(c);
+      await assertPermission(user, "system-user:assign-role");
+      await roleService.assertRolesAssignable(user, body.roleIds);
+    }
     const data = await userService.createUser(body);
     return c.json({ code: 0, message: "操作成功", data });
   } catch (err: any) {
@@ -54,6 +62,11 @@ route.openapi(routes.updateUser, async (c) => {
     remark?: string;
   };
   try {
+    if (body.roleIds !== undefined) {
+      const user = getAuthenticatedUser(c);
+      await assertPermission(user, "system-user:assign-role");
+      await roleService.assertRolesAssignable(user, body.roleIds);
+    }
     await userService.updateUser(body);
     return c.json({ code: 0, message: "操作成功", data: {} });
   } catch (err: any) {
@@ -86,7 +99,7 @@ route.openapi(routes.batchDeleteUser, async (c) => {
 route.openapi(routes.resetPassword, async (c) => {
   const body = c.req.valid("json");
   try {
-    await userService.resetPassword(body.id, body.password);
+    await authService.resetUserPassword(body.id, body.password);
     return c.json({ code: 0, message: "操作成功", data: {} });
   } catch (err: any) {
     return c.json(
@@ -113,13 +126,8 @@ route.openapi(routes.listRoleIds, async (c) => {
   return c.json({ code: 0, message: "操作成功", data });
 });
 
-route.post("/upload/avatar", async (c) => {
-  const body = await c.req.parseBody();
-  const file = body.file || body.files;
-  if (!(file instanceof File)) {
-    return c.json({ code: 10001, message: "请上传头像文件", data: {} }, 400);
-  }
-
+route.openapi(routes.uploadAvatar, async (c) => {
+  const { file } = c.req.valid("form");
   const url = await saveAvatar(file);
 
   return c.json({

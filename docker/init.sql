@@ -290,6 +290,7 @@ INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, `rank`, auths, st
 (104, 6, 1, '删除', 4, 'system-user:delete', 1),
 (105, 6, 1, '上传头像', 5, 'system-user:upload-avatar', 1),
 (106, 6, 1, '重置密码', 6, 'system-user:reset-password', 1),
+(122, 6, 1, '分配角色', 7, 'system-user:assign-role', 1),
 (107, 7, 1, '新增角色', 1, 'system-role:add', 1),
 (108, 7, 1, '修改', 2, 'system-role:edit', 1),
 (109, 7, 1, '删除', 3, 'system-role:delete', 1),

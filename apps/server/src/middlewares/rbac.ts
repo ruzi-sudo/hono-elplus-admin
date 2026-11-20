@@ -7,7 +7,7 @@ import { getAuthenticatedUser, type AuthenticatedUser } from "./auth";
 
 type PermissionResolver = string | ((c: Context) => string | Promise<string>);
 
-function isAdmin(user: AuthenticatedUser): boolean {
+export function isSystemAdmin(user: AuthenticatedUser): boolean {
   return user.roles.includes("admin");
 }
 
@@ -61,10 +61,25 @@ export async function hasPermission(
   return Boolean(row);
 }
 
+export async function assertPermission(
+  user: AuthenticatedUser,
+  permission: string,
+): Promise<void> {
+  if (
+    !isSystemAdmin(user) &&
+    !(await hasPermission(user.userId, permission))
+  ) {
+    throw new ForbiddenException(`缺少接口权限 ${permission}`);
+  }
+}
+
 export function requirePageAccess(pageName: string) {
   return async (c: Context, next: Next) => {
     const user = getAuthenticatedUser(c);
-    if (!isAdmin(user) && !(await hasPageAccess(user.userId, pageName))) {
+    if (
+      !isSystemAdmin(user) &&
+      !(await hasPageAccess(user.userId, pageName))
+    ) {
       throw new ForbiddenException(`无权访问页面 ${pageName}`);
     }
     await next();
@@ -76,9 +91,7 @@ export function requirePermission(requirement: PermissionResolver) {
     const user = getAuthenticatedUser(c);
     const permission =
       typeof requirement === "function" ? await requirement(c) : requirement;
-    if (!isAdmin(user) && !(await hasPermission(user.userId, permission))) {
-      throw new ForbiddenException(`缺少接口权限 ${permission}`);
-    }
+    await assertPermission(user, permission);
     await next();
   };
 }

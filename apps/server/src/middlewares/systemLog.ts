@@ -2,6 +2,50 @@ import type { Context, Next } from 'hono';
 import { getDb } from '../db';
 import { sysSystemLogs, sysSystemLogDetails } from '../db/schema';
 
+const MAX_LOGGED_JSON_BODY_BYTES = 64 * 1024;
+const SENSITIVE_FIELDS = new Set([
+  'password',
+  'confirmPassword',
+  'currentPassword',
+  'newPassword',
+  'oldPassword',
+  'accessToken',
+  'refreshToken',
+]);
+
+function redactSensitiveFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSensitiveFields);
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      SENSITIVE_FIELDS.has(key) ? '[REDACTED]' : redactSensitiveFields(nestedValue),
+    ]),
+  );
+}
+
+async function getSafeRequestBody(c: Context): Promise<string | null> {
+  const contentType = c.req.header('content-type')?.toLowerCase() || '';
+  if (contentType.startsWith('multipart/form-data')) {
+    return '[multipart/form-data omitted]';
+  }
+  if (!contentType.includes('application/json')) return null;
+
+  const contentLength = Number(c.req.header('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > MAX_LOGGED_JSON_BODY_BYTES) {
+    return '[JSON request body omitted because it exceeds the log limit]';
+  }
+
+  try {
+    const raw = await c.req.raw.clone().text();
+    if (!raw) return null;
+    return JSON.stringify(redactSensitiveFields(JSON.parse(raw)));
+  } catch {
+    return '[invalid JSON request body omitted]';
+  }
+}
+
 /**
  * 系统日志中间件
  * 标记在路由上即可自动记录请求/响应到 sys_system_logs
@@ -23,11 +67,7 @@ export async function systemLogMiddleware(c: Context, next: Next) {
   const start = Date.now();
 
   // 收集请求体
-  let requestBody: string | null = null;
-  try {
-    const cloned = c.req.raw.clone();
-    requestBody = await cloned.text().catch(() => null);
-  } catch { /* ignore */ }
+  const requestBody = await getSafeRequestBody(c);
 
   // 获取用户信息
   let username = '';

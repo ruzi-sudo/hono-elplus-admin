@@ -3,6 +3,7 @@ import { validatorParamsHook } from "../../common/validator";
 import * as routes from "./role.routes";
 import * as roleService from "../../service/role.service";
 import * as menuService from "../../service/menu.service";
+import { getAuthenticatedUser } from "../../middlewares/auth";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -73,7 +74,12 @@ route.openapi(routes.deleteRole, async (c) => {
 route.openapi(routes.saveRoleMenu, async (c) => {
   const body = c.req.valid("json");
   try {
-    await roleService.saveRoleMenu(body.id, body.menuIds, body.homePageId);
+    await roleService.saveRoleMenu(
+      body.id,
+      body.menuIds,
+      body.homePageId,
+      getAuthenticatedUser(c),
+    );
     return c.json({ code: 0, message: "操作成功", data: {} });
   } catch (err: any) {
     return c.json(

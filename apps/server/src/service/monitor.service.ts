@@ -141,6 +141,20 @@ export async function forceOfflineByUsername(username: string) {
   await db.delete(sysOnlineUsers).where(eq(sysOnlineUsers.username, username));
 }
 
+export async function forceOfflineByUserId(userId: number) {
+  const db = await getDb();
+  const onlineUsers = await db
+    .select({ id: sysOnlineUsers.id })
+    .from(sysOnlineUsers)
+    .where(eq(sysOnlineUsers.userId, userId));
+
+  for (const user of onlineUsers) {
+    await removeUserCredentialByOnlineUserId(user.id);
+  }
+
+  await db.delete(sysOnlineUsers).where(eq(sysOnlineUsers.userId, userId));
+}
+
 export async function deleteSystemLogs(ids: number[]) {
   const db = await getDb();
   if (ids.length === 0) return;

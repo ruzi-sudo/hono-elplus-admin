@@ -3,6 +3,7 @@ import { validatorParamsHook } from "../../common/validator";
 import * as routes from "./monitor.routes";
 import * as monitorService from "../../service/monitor.service";
 import { getAuth } from "../../auth";
+import { getAuthenticatedUser } from "../../middlewares/auth";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -55,12 +56,10 @@ route.openapi(routes.forceOffline, async (c) => {
 });
 
 route.openapi(routes.userLogout, async (c) => {
-  const user = (c as any).get("user") as { username?: string } | undefined;
-  const auth = await getAuth();
+  const user = getAuthenticatedUser(c);
+  const auth = await getAuth(c.req.raw);
   await auth.api.signOut({ headers: c.req.raw.headers });
-  if (user?.username) {
-    await monitorService.forceOfflineByUsername(user.username);
-  }
+  await monitorService.forceOfflineByUserId(user.userId);
   return c.json({ code: 0, message: "操作成功", data: {} });
 });
 
