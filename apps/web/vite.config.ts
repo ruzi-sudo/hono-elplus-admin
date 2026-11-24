@@ -11,9 +11,12 @@ import {
 
 export default async ({ mode }: ConfigEnv): Promise<UserConfigExport> => {
   const envDir = pathResolve("../..", import.meta.url);
-  const { VITE_PORT, VITE_COMPRESSION, VITE_PUBLIC_PATH } = wrapperEnv(
-    loadEnv(mode, envDir),
+  const { PORT = "8080", ...viteEnv } = loadEnv(
+    mode === "development" ? "dev" : mode,
+    envDir,
+    ["VITE_", "PORT"],
   );
+  const { VITE_PORT, VITE_COMPRESSION, VITE_PUBLIC_PATH } = wrapperEnv(viteEnv);
   return {
     base: VITE_PUBLIC_PATH,
     root,
@@ -24,11 +27,12 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfigExport> => {
     server: {
       // 端口号
       port: VITE_PORT,
+      strictPort: true,
       host: "0.0.0.0",
       // 本地跨域代理 https://cn.vitejs.dev/config/server-options.html#server-proxy
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:8080",
+          target: `http://127.0.0.1:${PORT}`,
           changeOrigin: true,
         },
       },

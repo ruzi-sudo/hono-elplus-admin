@@ -122,6 +122,8 @@ pnpm dev
 
 本地开发时需要确认 MySQL 和 Redis 配置与 `docker/docker-compose.yml` 保持一致。
 
+前端开发代理使用同一份配置中的 `PORT` 连接后端。若默认端口被其他项目占用，请在 `.env.dev` 中调整 `PORT` 和 `VITE_PORT`，再重启前后端；不要复用其他项目的 API。
+
 ## 数据库与初始化
 
 初始化 SQL 位于：
@@ -144,6 +146,8 @@ docker/init.sql
 mysql -h 127.0.0.1 -P 3308 -u root -p hono_elplus_admin \
   < docker/migrations/20261120_add_api_permissions.sql
 ```
+
+如果旧库仍显示上游、租户、工作台、对账等已下线菜单，使用同样的命令执行 `docker/migrations/20261124_remove_legacy_menus.sql`，然后刷新页面。迁移会清除这些菜单的角色授权和首页引用；右上角的账户设置入口不受影响。
 
 角色菜单和接口权限保存是两个独立操作；保存其中一类权限不会覆盖另一类权限。
 
