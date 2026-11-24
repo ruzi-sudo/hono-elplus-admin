@@ -76,6 +76,7 @@ menus:
   pureUser: User Manage
   pureRole: Role Manage
   pureSystemMenu: Menu Manage
+  pureApiPermission: API Permissions
   pureSysMonitor: System Monitor
   pureOnlineUser: Online User
   pureLoginLog: Login Log

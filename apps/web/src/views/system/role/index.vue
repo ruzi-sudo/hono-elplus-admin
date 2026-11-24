@@ -49,6 +49,11 @@ const {
   isShow,
   curRow,
   loading,
+  menuLoading,
+  menuError,
+  menuReady,
+  menuSaving,
+  menuTab,
   columns,
   rowStyle,
   dataList,
@@ -56,9 +61,6 @@ const {
   treeProps,
   homePageId,
   homePageOptions,
-  checkedApiPermissionIds,
-  apiPermissionData,
-  activePermissionTab,
   isLinkage,
   pagination,
   isExpandAll,
@@ -300,26 +302,28 @@ onMounted(() => {
               />
             </span>
             <Auth value="system-role:save-permission">
-              <span :class="[iconClass, 'ml-2']">
-                <IconifyIconOffline
-                  v-tippy="{
-                    content: '保存权限配置',
-                  }"
-                  class="dark:text-white"
-                  width="18px"
-                  height="18px"
-                  :icon="Check"
-                  @click="handleSave"
-                />
-              </span>
+              <el-button
+                class="ml-2"
+                link
+                type="primary"
+                title="保存权限配置"
+                aria-label="保存权限配置"
+                :icon="useRenderIcon(Check)"
+                :disabled="!menuReady || menuSaving"
+                @click="handleSave"
+              />
             </Auth>
           </div>
           <p class="font-bold truncate">
-            权限配置（页面/按钮与接口分开保存）
+            权限配置（页面与按钮）
             {{ `${curRow?.name ? `（${curRow.name}）` : ""}` }}
           </p>
         </div>
-        <el-tabs v-model="activePermissionTab" stretch>
+        <el-alert v-if="menuError" :title="menuError" type="error" show-icon>
+          <el-button link type="primary" @click="handleMenu(curRow)">重试</el-button>
+        </el-alert>
+        <el-skeleton v-if="menuLoading" :rows="4" animated />
+        <el-tabs v-show="menuReady" v-model="menuTab" v-loading="menuSaving" stretch>
           <el-tab-pane label="页面与按钮权限" name="menu">
             <el-input
               v-model="treeSearchValue"
@@ -347,31 +351,6 @@ onMounted(() => {
                 <span>{{ transformI18n(node.label) }}</span>
               </template>
             </el-tree-v2>
-          </el-tab-pane>
-          <el-tab-pane label="独立接口权限" name="api">
-            <div class="flex gap-2 mb-2">
-              <el-tag type="info">
-                已选择 {{ checkedApiPermissionIds.length }} 项
-              </el-tag>
-            </div>
-            <el-checkbox-group v-model="checkedApiPermissionIds">
-              <div
-                v-for="permission in apiPermissionData"
-                :key="permission.id"
-                class="flex items-center gap-2 py-2 border-b border-border"
-              >
-                <el-checkbox :value="permission.id">
-                  {{ permission.name }}
-                </el-checkbox>
-                <el-tag size="small">{{ permission.method }}</el-tag>
-                <span class="text-xs text-text_color_secondary">
-                  {{ permission.path }}
-                </span>
-                <span class="text-xs text-text_color_secondary">
-                  {{ permission.code }}
-                </span>
-              </div>
-            </el-checkbox-group>
           </el-tab-pane>
           <el-tab-pane label="角色首页" name="home">
             <el-form label-position="top" class="pt-2">

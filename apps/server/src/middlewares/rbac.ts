@@ -12,34 +12,14 @@ import {
 } from "../db/schema";
 import { getAuthenticatedUser, type AuthenticatedUser } from "./auth";
 
-
 export function isSystemAdmin(user: AuthenticatedUser): boolean {
   return user.roles.includes("admin");
 }
 
-export async function hasPageAccess(
-  userId: number,
-  pageName: string,
-): Promise<boolean> {
-  const db = await getDb();
-  const [row] = await db
-    .select({ id: sysPages.id })
-    .from(sysPages)
-    .innerJoin(sysRolePages, eq(sysPages.id, sysRolePages.pageId))
-    .innerJoin(sysUserRoles, eq(sysRolePages.roleId, sysUserRoles.roleId))
-    .innerJoin(sysRoles, eq(sysRolePages.roleId, sysRoles.id))
-    .where(
-      and(
-        eq(sysUserRoles.userId, userId),
-        eq(sysPages.name, pageName),
-        eq(sysPages.menuType, 0),
-        eq(sysPages.status, 1),
-        eq(sysRoles.status, 1),
-      ),
-    )
-    .limit(1);
-
-  return Boolean(row);
+export function assertSystemAdmin(user: AuthenticatedUser): void {
+  if (!isSystemAdmin(user)) {
+    throw new ForbiddenException("只有管理员可以执行此操作");
+  }
 }
 
 export async function hasButtonPermission(
@@ -124,31 +104,11 @@ export async function assertApiPermission(
   }
 }
 
-export async function assertPermission(
-  user: AuthenticatedUser,
-  permission: string,
-): Promise<void> {
-  return assertButtonPermission(user, permission);
-}
-
-export function requirePageAccess(pageName: string) {
-  return async (c: Context, next: Next) => {
-    const user = getAuthenticatedUser(c);
-    if (
-      !isSystemAdmin(user) &&
-      !(await hasPageAccess(user.userId, pageName))
-    ) {
-      throw new ForbiddenException(`无权访问页面 ${pageName}`);
-    }
-    await next();
-  };
-}
-
 export function requireApiPermission() {
   return async (c: Context, next: Next) => {
     const user = getAuthenticatedUser(c);
     const method = c.req.method;
-    const path = c.req.path.replace(/^\/api/, "") || "/";
+    const path = c.req.path.replace(/^\/api(?=\/|$)/, "") || "/";
     await assertApiPermission(user, method, path);
     await next();
   };

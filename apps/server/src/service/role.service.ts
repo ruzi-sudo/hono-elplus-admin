@@ -1,5 +1,5 @@
 import { eq, like, and, count, desc, inArray } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+import type { MySql2Database } from "drizzle-orm/mysql2";
 import { getDb } from "../db";
 import {
   sysRoles,
@@ -10,22 +10,45 @@ import {
   sysApiPermissions,
   sysRoleApiPermissions,
 } from "../db/schema";
+import type * as schema from "../db/schema";
 import { ForbiddenException, ParamsException } from "../common/exception";
 import type { AuthenticatedUser } from "../middlewares/auth";
+import { isSystemAdmin } from "../middlewares/rbac";
 
 const PROTECTED_ROLE_CODES = new Set(["admin", "common"]);
-
-function isSystemAdmin(user: AuthenticatedUser): boolean {
-  return user.roles.includes("admin");
-}
 
 function assertMutableRole(code: string): void {
   if (PROTECTED_ROLE_CODES.has(code)) {
     throw new ParamsException("系统内置角色不允许修改");
   }
 }
-async function getUserApiPermissionIds(userId: number): Promise<Set<number>> {
-  const db = await getDb();
+
+type PermissionQueries = Pick<MySql2Database<typeof schema>, "select">;
+
+function resolveGrantChanges(
+  existingIds: number[],
+  requestedIds: number[],
+  editableIds: ReadonlySet<number> | undefined,
+  forbiddenMessage: string,
+) {
+  const existing = new Set(existingIds);
+  const requested = new Set(requestedIds);
+  const added = [...requested].filter((id) => !existing.has(id));
+  if (editableIds && added.some((id) => !editableIds.has(id))) {
+    throw new ForbiddenException(forbiddenMessage);
+  }
+
+  // Omitting an out-of-scope grant must not revoke it; submitting it is a no-op.
+  const removed = existingIds.filter(
+    (id) => !requested.has(id) && (!editableIds || editableIds.has(id)),
+  );
+  return { added, removed };
+}
+
+async function getUserApiPermissionIds(
+  db: PermissionQueries,
+  userId: number,
+): Promise<Set<number>> {
   const rows = await db
     .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
     .from(sysRoleApiPermissions)
@@ -46,7 +69,7 @@ async function getUserApiPermissionIds(userId: number): Promise<Set<number>> {
 }
 
 async function assertValidHomePage(
-  db: any,
+  db: PermissionQueries,
   menuIds: number[],
   homePageId: number | null,
 ): Promise<void> {
@@ -77,8 +100,10 @@ async function assertValidHomePage(
   }
 }
 
-async function getUserPageIds(userId: number): Promise<Set<number>> {
-  const db = await getDb();
+async function getUserPageIds(
+  db: PermissionQueries,
+  userId: number,
+): Promise<Set<number>> {
   const rows = await db
     .select({ pageId: sysRolePages.pageId })
     .from(sysRolePages)
@@ -115,6 +140,14 @@ export async function assertRolesAssignable(
     throw new ForbiddenException("无权分配系统内置角色");
   }
 
+  await assertRoleGrantsAssignable(db, user.userId, uniqueRoleIds);
+}
+
+async function assertRoleGrantsAssignable(
+  db: PermissionQueries,
+  userId: number,
+  roleIds: number[],
+) {
   const [
     targetPageRows,
     allowedPageIds,
@@ -124,13 +157,13 @@ export async function assertRolesAssignable(
     db
       .select({ pageId: sysRolePages.pageId })
       .from(sysRolePages)
-      .where(inArray(sysRolePages.roleId, uniqueRoleIds)),
-    getUserPageIds(user.userId),
+      .where(inArray(sysRolePages.roleId, roleIds)),
+    getUserPageIds(db, userId),
     db
       .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
       .from(sysRoleApiPermissions)
-      .where(inArray(sysRoleApiPermissions.roleId, uniqueRoleIds)),
-    getUserApiPermissionIds(user.userId),
+      .where(inArray(sysRoleApiPermissions.roleId, roleIds)),
+    getUserApiPermissionIds(db, userId),
   ]);
 
   if (targetPageRows.some((row) => !allowedPageIds.has(row.pageId))) {
@@ -155,6 +188,20 @@ export async function listAllRoles() {
   return roles;
 }
 
+export async function listApiPermissionRoles() {
+  const db = await getDb();
+  const roles = await db
+    .select({
+      id: sysRoles.id,
+      name: sysRoles.name,
+      code: sysRoles.code,
+      status: sysRoles.status,
+    })
+    .from(sysRoles)
+    .orderBy(desc(sysRoles.id));
+  return roles.map((role) => ({ ...role, status: role.status ?? 0 }));
+}
+
 export async function getRoleIdsByUserId(userId: number) {
   const db = await getDb();
   const rows = await db
@@ -164,9 +211,9 @@ export async function getRoleIdsByUserId(userId: number) {
   return rows.map((r) => r.roleId);
 }
 
-export async function listApiPermissions(includeDisabled = false) {
+export async function listApiPermissions(user: AuthenticatedUser) {
   const db = await getDb();
-  const query = db
+  const permissions = await db
     .select({
       id: sysApiPermissions.id,
       code: sysApiPermissions.code,
@@ -184,9 +231,13 @@ export async function listApiPermissions(includeDisabled = false) {
       sysApiPermissions.sort,
       sysApiPermissions.id,
     );
-  return includeDisabled
-    ? query
-    : query.where(eq(sysApiPermissions.status, 1));
+  const editableIds = isSystemAdmin(user)
+    ? undefined
+    : await getUserApiPermissionIds(db, user.userId);
+  return permissions.map((permission) => ({
+    ...permission,
+    assignable: !editableIds || editableIds.has(permission.id),
+  }));
 }
 
 export async function createApiPermission(input: {
@@ -197,6 +248,7 @@ export async function createApiPermission(input: {
   path: string;
   description?: string;
   sort?: number;
+  status?: number;
 }) {
   const db = await getDb();
   const [result] = await db.insert(sysApiPermissions).values(input);
@@ -215,10 +267,33 @@ export async function updateApiPermission(input: {
   status?: number;
 }) {
   const db = await getDb();
-  await db
-    .update(sysApiPermissions)
-    .set({ ...input, updatedAt: new Date() })
-    .where(eq(sysApiPermissions.id, input.id));
+  const { id, ...changes } = input;
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ method: sysApiPermissions.method, path: sysApiPermissions.path })
+      .from(sysApiPermissions)
+      .where(eq(sysApiPermissions.id, id))
+      .for("update");
+    if (!current) throw new ParamsException("接口权限不存在");
+    const repointsEndpoint =
+      (changes.method !== undefined && changes.method !== current.method) ||
+      (changes.path !== undefined && changes.path !== current.path);
+    if (repointsEndpoint) {
+      const [grant] = await tx
+        .select({ id: sysRoleApiPermissions.id })
+        .from(sysRoleApiPermissions)
+        .where(eq(sysRoleApiPermissions.apiPermissionId, id))
+        .limit(1);
+      if (grant) {
+        throw new ParamsException("已分配的接口权限不能修改请求方法或路径");
+      }
+    }
+
+    await tx
+      .update(sysApiPermissions)
+      .set({ ...changes, updatedAt: new Date() })
+      .where(eq(sysApiPermissions.id, id));
+  });
 }
 
 export async function getRoleMenuIds(roleId: number) {
@@ -345,50 +420,55 @@ export async function createRole(params: {
   return { id: Number(result.insertId) };
 }
 
-export async function updateRole(params: {
-  id: number;
-  name?: string;
-  code?: string;
-  status?: number;
-  remark?: string;
-}) {
+export async function updateRole(
+  params: {
+    id: number;
+    name?: string;
+    code?: string;
+    status?: number;
+    remark?: string;
+  },
+  user: AuthenticatedUser,
+) {
   const db = await getDb();
-
-  const [existing] = await db
-    .select({ id: sysRoles.id, code: sysRoles.code })
-    .from(sysRoles)
-    .where(eq(sysRoles.id, params.id))
-    .limit(1);
-  if (!existing) {
-    throw { code: 10003, message: "角色不存在", status: 404 };
-  }
-
-  assertMutableRole(existing.code);
-
-  if (params.code !== undefined && params.code !== existing.code) {
-    if (PROTECTED_ROLE_CODES.has(params.code)) {
-      throw new ParamsException("角色标识为系统保留值");
-    }
-    const [sameCode] = await db
-      .select({ id: sysRoles.id })
+  const { id, ...changes } = params;
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ code: sysRoles.code, status: sysRoles.status })
       .from(sysRoles)
-      .where(eq(sysRoles.code, params.code))
-      .limit(1);
-    if (sameCode && sameCode.id !== params.id) {
-      throw new ParamsException("角色标识已存在");
+      .where(eq(sysRoles.id, id))
+      .for("update");
+    if (!existing) {
+      throw { code: 10003, message: "角色不存在", status: 404 };
     }
-  }
+    assertMutableRole(existing.code);
 
-  const updateData: Record<string, any> = {};
-  if (params.name !== undefined) updateData.name = params.name;
-  if (params.code !== undefined) updateData.code = params.code;
-  if (params.status !== undefined) updateData.status = params.status;
-  if (params.remark !== undefined) updateData.remark = params.remark;
+    if (changes.code !== undefined && changes.code !== existing.code) {
+      if (PROTECTED_ROLE_CODES.has(changes.code)) {
+        throw new ParamsException("角色标识为系统保留值");
+      }
+      const [sameCode] = await tx
+        .select({ id: sysRoles.id })
+        .from(sysRoles)
+        .where(eq(sysRoles.code, changes.code))
+        .limit(1);
+      if (sameCode && sameCode.id !== id) {
+        throw new ParamsException("角色标识已存在");
+      }
+    }
 
-  if (Object.keys(updateData).length > 0) {
-    updateData.updatedAt = new Date();
-    await db.update(sysRoles).set(updateData).where(eq(sysRoles.id, params.id));
-  }
+    // Enabling a role can confer all its existing grants on its members.
+    if (!isSystemAdmin(user) && changes.status === 1 && existing.status !== 1) {
+      await assertRoleGrantsAssignable(tx, user.userId, [id]);
+    }
+
+    if (Object.values(changes).some((value) => value !== undefined)) {
+      await tx
+        .update(sysRoles)
+        .set({ ...changes, updatedAt: new Date() })
+        .where(eq(sysRoles.id, id));
+    }
+  });
 }
 
 export async function deleteRole(id: number) {
@@ -449,102 +529,123 @@ export async function saveRoleMenu(
   user: AuthenticatedUser,
 ) {
   const db = await getDb();
-  const uniqueMenuIds = [...new Set(menuIds)];
-
-  const [role] = await db
-    .select({ id: sysRoles.id, code: sysRoles.code })
-    .from(sysRoles)
-    .where(eq(sysRoles.id, id))
-    .limit(1);
-  if (!role) {
-    throw { code: 10003, message: "角色不存在", status: 404 };
-  }
-
-  assertMutableRole(role.code);
-
-  if (!isSystemAdmin(user)) {
-    const allowedPageIds = await getUserPageIds(user.userId);
-    if (uniqueMenuIds.some((pageId) => !allowedPageIds.has(pageId))) {
-      throw new ForbiddenException("只能配置自身已有权限范围内的菜单");
-    }
-  }
-
-  if (uniqueMenuIds.length > 0) {
-    const pages = await db
-      .select({ id: sysPages.id })
-      .from(sysPages)
-      .where(inArray(sysPages.id, uniqueMenuIds));
-    if (pages.length !== uniqueMenuIds.length) {
-      throw { code: 10001, message: "菜单权限中包含不存在的页面", status: 400 };
-    }
-  }
-
-  await assertValidHomePage(db, uniqueMenuIds, homePageId);
-
   await db.transaction(async (tx) => {
-    await tx.delete(sysRolePages).where(eq(sysRolePages.roleId, id));
-    if (uniqueMenuIds.length > 0) {
+    const [role] = await tx
+      .select({ code: sysRoles.code, homePageId: sysRoles.homePageId })
+      .from(sysRoles)
+      .where(eq(sysRoles.id, id))
+      .for("update");
+    if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
+    assertMutableRole(role.code);
+
+    const rows = await tx
+      .select({ pageId: sysRolePages.pageId })
+      .from(sysRolePages)
+      .where(eq(sysRolePages.roleId, id));
+    const existingIds = rows.map((row) => row.pageId);
+    const editableIds = isSystemAdmin(user)
+      ? undefined
+      : await getUserPageIds(tx, user.userId);
+    const { added, removed } = resolveGrantChanges(
+      existingIds,
+      menuIds,
+      editableIds,
+      "只能配置自身已有权限范围内的菜单",
+    );
+
+    if (added.length > 0) {
+      const pages = await tx
+        .select({ id: sysPages.id })
+        .from(sysPages)
+        .where(inArray(sysPages.id, added));
+      if (pages.length !== added.length) {
+        throw new ParamsException("菜单权限中包含不存在的页面");
+      }
+    }
+
+    if (homePageId !== null) {
+      if (editableIds && !editableIds.has(homePageId)) {
+        if (homePageId !== role.homePageId) {
+          throw new ForbiddenException("只能设置自身已有权限范围内的角色首页");
+        }
+      } else {
+        const finalIds = new Set(existingIds);
+        for (const pageId of removed) finalIds.delete(pageId);
+        for (const pageId of added) finalIds.add(pageId);
+        await assertValidHomePage(tx, [...finalIds], homePageId);
+      }
+    }
+
+    if (removed.length > 0) {
+      await tx.delete(sysRolePages).where(
+        and(eq(sysRolePages.roleId, id), inArray(sysRolePages.pageId, removed)),
+      );
+    }
+    if (added.length > 0) {
       await tx
         .insert(sysRolePages)
-        .values(
-          uniqueMenuIds.map((menuId) => ({ roleId: id, pageId: menuId })),
-        );
+        .values(added.map((pageId) => ({ roleId: id, pageId })));
     }
     await tx
       .update(sysRoles)
-      .set({
-        homePageId,
-        updatedAt: new Date(),
-      } as Partial<typeof sysRoles.$inferInsert>)
+      .set({ homePageId, updatedAt: new Date() })
       .where(eq(sysRoles.id, id));
   });
 }
+
 export async function saveRoleApiPermissions(
   id: number,
   apiPermissionIds: number[],
   user: AuthenticatedUser,
 ) {
   const db = await getDb();
-  const uniqueApiPermissionIds = [...new Set(apiPermissionIds)];
-  const [role] = await db
-    .select({ id: sysRoles.id, code: sysRoles.code })
-    .from(sysRoles)
-    .where(eq(sysRoles.id, id))
-    .limit(1);
-  if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
-  assertMutableRole(role.code);
+  await db.transaction(async (tx) => {
+    const [role] = await tx
+      .select({ code: sysRoles.code })
+      .from(sysRoles)
+      .where(eq(sysRoles.id, id))
+      .for("update");
+    if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
+    assertMutableRole(role.code);
 
-  if (!isSystemAdmin(user)) {
-    const allowedApiPermissionIds = await getUserApiPermissionIds(user.userId);
-    if (
-      uniqueApiPermissionIds.some(
-        (permissionId) => !allowedApiPermissionIds.has(permissionId),
-      )
-    ) {
-      throw new ForbiddenException("只能配置自身已有权限范围内的接口");
-    }
-  }
-
-  if (uniqueApiPermissionIds.length > 0) {
-    const apiRows = await db
-      .select({ id: sysApiPermissions.id })
-      .from(sysApiPermissions)
-      .where(inArray(sysApiPermissions.id, uniqueApiPermissionIds));
-    if (apiRows.length !== uniqueApiPermissionIds.length) {
+    const requestedIds = [...new Set(apiPermissionIds)];
+    // Serialize with catalog edits before deciding which endpoint IDs to grant.
+    const definitions =
+      requestedIds.length > 0
+        ? await tx
+            .select({ id: sysApiPermissions.id })
+            .from(sysApiPermissions)
+            .where(inArray(sysApiPermissions.id, requestedIds))
+            .for("share")
+        : [];
+    const rows = await tx
+      .select({ apiPermissionId: sysRoleApiPermissions.apiPermissionId })
+      .from(sysRoleApiPermissions)
+      .where(eq(sysRoleApiPermissions.roleId, id));
+    const editableIds = isSystemAdmin(user)
+      ? undefined
+      : await getUserApiPermissionIds(tx, user.userId);
+    const { added, removed } = resolveGrantChanges(
+      rows.map((row) => row.apiPermissionId),
+      requestedIds,
+      editableIds,
+      "只能配置自身已有权限范围内的接口",
+    );
+    if (definitions.length !== requestedIds.length) {
       throw new ParamsException("接口权限中包含不存在的权限");
     }
-  }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(sysRoleApiPermissions)
-      .where(eq(sysRoleApiPermissions.roleId, id));
-    if (uniqueApiPermissionIds.length > 0) {
+    if (removed.length > 0) {
+      await tx.delete(sysRoleApiPermissions).where(
+        and(
+          eq(sysRoleApiPermissions.roleId, id),
+          inArray(sysRoleApiPermissions.apiPermissionId, removed),
+        ),
+      );
+    }
+    if (added.length > 0) {
       await tx.insert(sysRoleApiPermissions).values(
-        uniqueApiPermissionIds.map((apiPermissionId) => ({
-          roleId: id,
-          apiPermissionId,
-        })),
+        added.map((apiPermissionId) => ({ roleId: id, apiPermissionId })),
       );
     }
   });

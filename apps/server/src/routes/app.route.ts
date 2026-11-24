@@ -8,10 +8,7 @@ import { route as menuRoute } from "./menu/menu.handlers";
 import { route as monitorRoute } from "./monitor/monitor.handlers";
 import { route as dashboardRoute } from "./dashboard/dashboard.handlers";
 import { authMiddleware } from "../middlewares/auth";
-import {
-  requireApiPermission,
-  requirePageAccess,
-} from "../middlewares/rbac";
+import { requireApiPermission } from "../middlewares/rbac";
 import { systemLogMiddleware } from "../middlewares/systemLog";
 import { avatarUploadLimitMiddleware } from "../middlewares/uploadLimit";
 import { errorHandler } from "../middlewares/error";
@@ -39,7 +36,6 @@ app.use("/list-all-role", authMiddleware);
 app.use("/list-role-ids", authMiddleware);
 app.use("/upload/*", authMiddleware);
 app.use("/upload/avatar", avatarUploadLimitMiddleware);
-app.use("/user", requirePageAccess("SystemUser"));
 app.use("/user", requireApiPermission());
 app.use(
   "/user/create",
@@ -61,16 +57,8 @@ app.use(
   "/user/reset-password",
   requireApiPermission(),
 );
-app.use(
-  "/list-all-role",
-  requirePageAccess("SystemUser"),
-  requireApiPermission(),
-);
-app.use(
-  "/list-role-ids",
-  requirePageAccess("SystemUser"),
-  requireApiPermission(),
-);
+app.use("/list-all-role", requireApiPermission());
+app.use("/list-role-ids", requireApiPermission());
 app.use(
   "/upload/avatar",
   requireApiPermission(),
@@ -84,9 +72,11 @@ app.use("/role/*", authMiddleware);
 app.use("/role/*", systemLogMiddleware);
 app.use("/role-menu", authMiddleware);
 app.use("/role-menu-ids", authMiddleware);
-app.use("/role-api-permissions", authMiddleware);
-app.use("/role-api-permission-ids", authMiddleware);
-app.use("/role", requirePageAccess("SystemRole"));
+app.use("/role-api-permissions", authMiddleware, requireApiPermission());
+app.use("/role-api-permissions/roles", authMiddleware, requireApiPermission());
+app.use("/role-api-permissions/create", authMiddleware, requireApiPermission());
+app.use("/role-api-permissions/update", authMiddleware, requireApiPermission());
+app.use("/role-api-permission-ids", authMiddleware, requireApiPermission());
 app.use("/role", requireApiPermission());
 app.use(
   "/role/create",
@@ -100,26 +90,8 @@ app.use(
   "/role/delete",
   requireApiPermission(),
 );
-app.use(
-  "/role-menu",
-  requirePageAccess("SystemRole"),
-  requireApiPermission(),
-);
-app.use(
-  "/role-menu-ids",
-  requirePageAccess("SystemRole"),
-  requireApiPermission(),
-);
-app.use(
-  "/role-api-permissions",
-  requirePageAccess("SystemRole"),
-  requireApiPermission(),
-);
-app.use(
-  "/role-api-permission-ids",
-  requirePageAccess("SystemRole"),
-  requireApiPermission(),
-);
+app.use("/role-menu", requireApiPermission());
+app.use("/role-menu-ids", requireApiPermission());
 app.use(
   "/role/save-menu",
   requireApiPermission(),
@@ -134,7 +106,6 @@ app.route("/", roleRoute);
 app.use("/menu/*", authMiddleware);
 app.use("/menu/*", systemLogMiddleware);
 app.use("/get-async-routes", authMiddleware);
-app.use("/menu", requirePageAccess("SystemMenu"));
 app.use("/menu", requireApiPermission());
 app.use(
   "/menu/create",
@@ -161,7 +132,6 @@ app.use("/login-logs/*", authMiddleware);
 app.use("/system-logs/*", authMiddleware);
 app.use("/system-logs-detail", authMiddleware);
 app.use("/logout", authMiddleware, requireApiPermission());
-app.use("/online-logs", requirePageAccess("OnlineUser"));
 app.use(
   "/online-logs",
   requireApiPermission(),
@@ -170,7 +140,6 @@ app.use(
   "/online-logs/force-offline",
   requireApiPermission(),
 );
-app.use("/login-logs", requirePageAccess("LoginLog"));
 app.use(
   "/login-logs",
   requireApiPermission(),
@@ -183,16 +152,11 @@ app.use(
   "/login-logs/clear",
   requireApiPermission(),
 );
-app.use("/system-logs", requirePageAccess("SystemLog"));
 app.use(
   "/system-logs",
   requireApiPermission(),
 );
-app.use(
-  "/system-logs-detail",
-  requirePageAccess("SystemLog"),
-  requireApiPermission(),
-);
+app.use("/system-logs-detail", requireApiPermission());
 app.use(
   "/system-logs/delete",
   requireApiPermission(),
@@ -222,12 +186,10 @@ app.use(
 );
 app.use("/get-card-list", authMiddleware);
 app.use("/get-map-info", authMiddleware);
-app.use("/get-card-list", requirePageAccess("Welcome"));
 app.use(
   "/get-card-list",
   requireApiPermission(),
 );
-app.use("/get-map-info", requirePageAccess("Welcome"));
 app.use(
   "/get-map-info",
   requireApiPermission(),

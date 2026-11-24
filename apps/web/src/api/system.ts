@@ -47,6 +47,27 @@ export type ApiPermission = {
   description?: string | null;
   sort?: number | null;
   status?: number | null;
+  assignable: boolean;
+};
+
+export type ApiPermissionRole = {
+  id: number;
+  name: string;
+  code: string;
+  status: number;
+};
+
+export type ApiPermissionRolesResult = Result<ApiPermissionRole[]>;
+
+type ApiPermissionDefinition = {
+  code: string;
+  name: string;
+  module: string;
+  method: string;
+  path: string;
+  description?: string;
+  sort?: number;
+  status?: number;
 };
 
 /** 获取系统管理-用户管理列表 */
@@ -112,12 +133,12 @@ export const deleteRole = (data?: object) => {
 };
 
 /** 保存角色菜单权限 */
-export const saveRoleMenu = (data?: object) => {
+export const saveRoleMenu = (data: { id: number; menuIds: number[]; homePageId: number | null }) => {
   return http.request<Result>("post", "/api/role/save-menu", { data });
 };
 
 /** 获取角色菜单权限ID */
-export const getRoleMenuIds = (data?: object) => {
+export const getRoleMenuIds = (data: { id: number }) => {
   return http.request<RoleMenuPermissionResult>(
     "post",
     "/api/role-menu-ids",
@@ -125,21 +146,26 @@ export const getRoleMenuIds = (data?: object) => {
   );
 };
 
-/** 获取接口权限列表 */
+/** 获取接口权限目录。 */
 export const listApiPermissions = () => {
   return http.request<Result<ApiPermission[]>>("get", "/api/role-api-permissions");
 };
 
-export const createApiPermission = (data?: object) => {
+export const createApiPermission = (data: ApiPermissionDefinition) => {
   return http.request<Result>("post", "/api/role-api-permissions/create", { data });
 };
 
-export const updateApiPermission = (data?: object) => {
+export const updateApiPermission = (data: Partial<ApiPermissionDefinition> & { id: number }) => {
   return http.request<Result>("post", "/api/role-api-permissions/update", { data });
 };
 
-/** 查询角色已分配的接口权限 */
-export const getRoleApiPermissionIds = (data?: object) => {
+/** 获取可配置的角色列表。 */
+export const listApiPermissionRoles = () => {
+  return http.request<ApiPermissionRolesResult>("get", "/api/role-api-permissions/roles");
+};
+
+/** 查询角色已分配的接口权限。 */
+export const getRoleApiPermissionIds = (data: { id: number }) => {
   return http.request<RoleApiPermissionResult>(
     "post",
     "/api/role-api-permission-ids",
@@ -147,8 +173,8 @@ export const getRoleApiPermissionIds = (data?: object) => {
   );
 };
 
-/** 保存角色接口权限 */
-export const saveRoleApiPermissions = (data?: object) => {
+/** 保存角色接口权限。 */
+export const saveRoleApiPermissions = (data: { id: number; apiPermissionIds: number[] }) => {
   return http.request<Result>("post", "/api/role/save-api-permissions", { data });
 };
 

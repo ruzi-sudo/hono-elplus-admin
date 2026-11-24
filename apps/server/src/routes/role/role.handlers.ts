@@ -4,6 +4,7 @@ import * as routes from "./role.routes";
 import * as roleService from "../../service/role.service";
 import * as menuService from "../../service/menu.service";
 import { getAuthenticatedUser } from "../../middlewares/auth";
+import { assertSystemAdmin } from "../../middlewares/rbac";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -48,7 +49,7 @@ route.openapi(routes.updateRole, async (c) => {
     remark?: string;
   };
   try {
-    await roleService.updateRole(body);
+    await roleService.updateRole(body, getAuthenticatedUser(c));
     return c.json({ code: 0, message: "操作成功", data: {} });
   } catch (err: any) {
     return c.json(
@@ -90,8 +91,13 @@ route.openapi(routes.saveRoleMenu, async (c) => {
 });
 
 route.openapi(routes.listApiPermissions, async (c) => {
-  const data = await roleService.listApiPermissions(true);
+  const data = await roleService.listApiPermissions(getAuthenticatedUser(c));
   return c.json({ code: 0, message: "操作成功", data });
+});
+
+route.openapi(routes.listApiPermissionRoles, async (c) => {
+  const data = await roleService.listApiPermissionRoles();
+  return c.json({ code: 0, message: "操作成功", data }, 200);
 });
 
 route.openapi(routes.getRoleApiPermissionIds, async (c) => {
@@ -101,15 +107,8 @@ route.openapi(routes.getRoleApiPermissionIds, async (c) => {
 });
 
 route.openapi(routes.createApiPermission, async (c) => {
-  const body = c.req.valid("json") as {
-    code: string;
-    name: string;
-    module: string;
-    method: string;
-    path: string;
-    description?: string;
-    sort?: number;
-  };
+  assertSystemAdmin(getAuthenticatedUser(c));
+  const body = c.req.valid("json") as Parameters<typeof roleService.createApiPermission>[0];
   try {
     const data = await roleService.createApiPermission(body);
     return c.json({ code: 0, message: "操作成功", data });
@@ -120,17 +119,8 @@ route.openapi(routes.createApiPermission, async (c) => {
 });
 
 route.openapi(routes.updateApiPermission, async (c) => {
-  const body = c.req.valid("json") as {
-    id: number;
-    code?: string;
-    name?: string;
-    module?: string;
-    method?: string;
-    path?: string;
-    description?: string;
-    sort?: number;
-    status?: number;
-  };
+  assertSystemAdmin(getAuthenticatedUser(c));
+  const body = c.req.valid("json") as Parameters<typeof roleService.updateApiPermission>[0];
   try {
     await roleService.updateApiPermission(body);
     return c.json({ code: 0, message: "操作成功", data: {} });

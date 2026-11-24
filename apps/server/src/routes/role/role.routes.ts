@@ -37,7 +37,7 @@ export const createRole = createRoute({
           schema: z.object({
             name: z.string().min(1).max(64),
             code: z.string().min(1).max(64),
-            status: z.coerce.number().optional(),
+            status: z.coerce.number().int().min(0).max(1).optional(),
             remark: z.string().optional(),
           }),
         },
@@ -66,7 +66,7 @@ export const updateRole = createRoute({
             id: z.number(),
             name: z.string().min(1).max(64).optional(),
             code: z.string().min(1).max(64).optional(),
-            status: z.coerce.number().optional(),
+            status: z.coerce.number().int().min(0).max(1).optional(),
             remark: z.string().optional(),
           }),
         },
@@ -156,6 +156,20 @@ export const listApiPermissions = createRoute({
   tags: ["role"],
   responses: {
     "200": { description: "接口权限列表" },
+    "401": {
+      description: "未授权",
+      content: { "application/json": { schema: ErrorResponseSchema } },
+    },
+    "403": ForbiddenResponse,
+  },
+});
+
+export const listApiPermissionRoles = createRoute({
+  method: "get",
+  path: "/role-api-permissions/roles",
+  tags: ["role"],
+  responses: {
+    "200": { description: "接口权限可配置角色列表" },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

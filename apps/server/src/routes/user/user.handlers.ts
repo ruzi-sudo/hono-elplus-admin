@@ -7,7 +7,7 @@ import * as roleService from "../../service/role.service";
 import * as authService from "../../service/auth.service";
 import { saveAvatar } from "../../service/upload.service";
 import { getAuthenticatedUser } from "../../middlewares/auth";
-import { assertPermission } from "../../middlewares/rbac";
+import { assertButtonPermission } from "../../middlewares/rbac";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -38,7 +38,7 @@ route.openapi(routes.createUser, async (c) => {
   try {
     if (body.roleIds !== undefined) {
       const user = getAuthenticatedUser(c);
-      await assertPermission(user, "system-user:assign-role");
+      await assertButtonPermission(user, "system-user:assign-role");
       await roleService.assertRolesAssignable(user, body.roleIds);
     }
     const data = await userService.createUser(body);
@@ -64,7 +64,7 @@ route.openapi(routes.updateUser, async (c) => {
   try {
     if (body.roleIds !== undefined) {
       const user = getAuthenticatedUser(c);
-      await assertPermission(user, "system-user:assign-role");
+      await assertButtonPermission(user, "system-user:assign-role");
       await roleService.assertRolesAssignable(user, body.roleIds);
     }
     await userService.updateUser(body);

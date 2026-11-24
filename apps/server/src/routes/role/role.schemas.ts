@@ -39,10 +39,10 @@ export const ApiPermissionSchema = z.object({
   path: z.string().min(1).max(255),
   description: z.string().max(255).optional(),
   sort: z.coerce.number().int().optional(),
-  status: z.coerce.number().int().optional(),
+  status: z.coerce.number().int().min(0).max(1).optional(),
 });
 
-export const CreateApiPermissionSchema = ApiPermissionSchema.omit({ id: true, status: true });
+export const CreateApiPermissionSchema = ApiPermissionSchema.omit({ id: true });
 
 export const UpdateApiPermissionSchema = ApiPermissionSchema.partial().extend({
   id: z.number().positive().int(),
