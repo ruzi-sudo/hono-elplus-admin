@@ -103,6 +103,8 @@ docker compose -f docker/docker-compose.yml up -d
 pnpm dev
 ```
 
+等到终端同时显示 Vite 的访问地址和后端的 `[Server] Running on ...`，再打开前端。只有 Vite 就绪不代表 API 已经开始监听。
+
 默认访问地址：
 
 - 前端：`http://localhost:8848`
