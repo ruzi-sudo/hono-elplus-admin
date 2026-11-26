@@ -9,6 +9,12 @@
     "start": "node dist/bootstrap.js",
     "test": "node --experimental-strip-types --test",
     "typecheck": "tsc --noEmit --skipLibCheck",
+    "db:check": "drizzle-kit check --config=drizzle.config.ts",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
+    "db:introspect": "drizzle-kit introspect --config=drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "clean": "rimraf dist"
   },
   "dependencies": {

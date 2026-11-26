@@ -6,8 +6,8 @@ import {
   text,
   datetime,
   index,
-  uniqueIndex,
 } from "drizzle-orm/mysql-core";
+import { sql } from "drizzle-orm";
 
 export const sysRoles = mysqlTable(
   "sys_roles",
@@ -18,11 +18,11 @@ export const sysRoles = mysqlTable(
     status: tinyint("status").default(1),
     remark: text("remark"),
     homePageId: int("home_page_id"),
-    createdAt: datetime("created_at", { mode: "date" }).default(new Date()),
-    updatedAt: datetime("updated_at", { mode: "date" }).default(new Date()),
+    createdAt: datetime("created_at", { mode: "date" }).default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: datetime("updated_at", { mode: "date" }).default(sql`(CURRENT_TIMESTAMP)`),
   },
   (table) => ({
-    codeIdx: uniqueIndex("idx_roles_code").on(table.code),
+    codeIdx: index("idx_roles_code").on(table.code),
     homePageIdIdx: index("idx_roles_home_page_id").on(table.homePageId),
   }),
 );

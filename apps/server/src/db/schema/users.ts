@@ -1,5 +1,5 @@
 import { mysqlTable, int, varchar, text, tinyint, datetime, uniqueIndex, index } from 'drizzle-orm/mysql-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 export const sysUsers = mysqlTable('sys_users', {
   id: int('id').primaryKey().autoincrement(),
@@ -8,10 +8,10 @@ export const sysUsers = mysqlTable('sys_users', {
   email: varchar('email', { length: 128 }),
   status: tinyint('status').default(1),
   remark: text('remark'),
-  createdAt: datetime('created_at', { mode: 'date' }).default(new Date()),
-  updatedAt: datetime('updated_at', { mode: 'date' }).default(new Date()),
+  createdAt: datetime('created_at', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: datetime('updated_at', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
-  usernameIdx: uniqueIndex('idx_users_username').on(table.username),
+  usernameIdx: index('idx_users_username').on(table.username),
 }));
 
 export const sysUserRoles = mysqlTable('sys_user_roles', {

@@ -1,4 +1,5 @@
 import { mysqlTable, int, varchar, tinyint, datetime, index, uniqueIndex } from 'drizzle-orm/mysql-core';
+import { sql } from 'drizzle-orm';
 
 export const sysPages = mysqlTable('sys_pages', {
   id: int('id').primaryKey().autoincrement(),
@@ -22,8 +23,8 @@ export const sysPages = mysqlTable('sys_pages', {
   showLink: tinyint('show_link').default(1),
   showParent: tinyint('show_parent').default(0),
   status: tinyint('status').default(1),
-  createdAt: datetime('created_at', { mode: 'date' }).default(new Date()),
-  updatedAt: datetime('updated_at', { mode: 'date' }).default(new Date()),
+  createdAt: datetime('created_at', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: datetime('updated_at', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
   parentIdIdx: index('idx_pages_parent_id').on(table.parentId),
 }));
