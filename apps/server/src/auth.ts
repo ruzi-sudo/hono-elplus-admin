@@ -19,6 +19,9 @@ export const PASSWORD_MAX_LENGTH = 128;
 export const PASSWORD_HASH_ROUNDS = 10;
 const SESSION_EXPIRES_IN_SECONDS = 604800;
 const SESSION_UPDATE_AGE_SECONDS = 86400;
+const AUTH_BASE_URL =
+  process.env.BETTER_AUTH_URL?.trim() ||
+  `http://127.0.0.1:${process.env.PORT || 8080}`;
 
 let authPromise: ReturnType<typeof createAuth> | null = null;
 
@@ -36,7 +39,7 @@ async function createAuth() {
   const db = await getDb();
 
   return betterAuth({
-    appName: APP_NAME,
+    baseURL: AUTH_BASE_URL,
     basePath: AUTH_BASE_PATH,
     secret: getSecret(),
     database: drizzleAdapter(db, {

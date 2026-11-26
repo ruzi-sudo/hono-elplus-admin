@@ -22,7 +22,7 @@ app.use(
     origin: ["http://localhost:8848", "http://127.0.0.1:8848"],
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Client-Public-IP"],
   }),
 );
 

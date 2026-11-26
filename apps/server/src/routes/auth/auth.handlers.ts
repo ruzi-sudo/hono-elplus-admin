@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { validatorParamsHook } from '../../common/validator';
 import * as routes from './auth.routes';
 import * as authService from '../../service/auth.service';
+import { getClientIp } from '../../service/ip.service';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 function getErrorStatus(error: unknown): ContentfulStatusCode {
@@ -24,7 +25,7 @@ route.openapi(routes.login, async (c) => {
   const body = c.req.valid('json');
   try {
     const data = await authService.login(body.username, body.password, c.req.raw, {
-      ip: c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || '127.0.0.1',
+      ip: getClientIp(c),
       ua: c.req.header('user-agent') || '',
     });
     return c.json({ code: 0, message: '操作成功', data });

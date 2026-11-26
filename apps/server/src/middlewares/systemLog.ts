@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono';
+import { getClientIp, lookupIpAddress } from '../service/ip.service';
 import { getDb } from '../db';
 import { sysSystemLogs, sysSystemLogDetails } from '../db/schema';
 
@@ -95,6 +96,7 @@ export async function systemLogMiddleware(c: Context, next: Next) {
 
   // 获取模块名
   const module = path.split('/').filter(Boolean)[0] || '';
+  const ip = getClientIp(c);
 
   // 先执行 next，拿到响应状态
   try {
@@ -104,7 +106,7 @@ export async function systemLogMiddleware(c: Context, next: Next) {
     const took = Date.now() - start;
     await writeLog({
       username, module, path, method: c.req.method,
-      requestBody, ip: getClientIp(c), system, browser,
+      requestBody, ip, system, browser,
       status: 0, userId, took, error: (err as Error).message, reqHeaders: {}, resHeaders: {},
     });
     throw err;
@@ -135,16 +137,11 @@ export async function systemLogMiddleware(c: Context, next: Next) {
   // 异步写入，不阻塞响应
   writeLog({
     username, userId, module, path, method: c.req.method,
-    requestBody, responseBody, ip: getClientIp(c), system, browser,
+    requestBody, responseBody, ip, system, browser,
     status, took, reqHeaders, resHeaders,
   }).catch(() => {});
 }
 
-function getClientIp(c: Context): string {
-  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
-    || c.req.header('x-real-ip')
-    || '127.0.0.1';
-}
 
 async function writeLog(params: {
   username: string;
@@ -181,7 +178,7 @@ async function writeLog(params: {
       responseData: params.responseBody ? params.responseBody.slice(0, 2000) : null,
       errorMessage: params.error || null,
       ip: params.ip,
-      address: '',
+      address: await lookupIpAddress(params.ip),
       system: params.system,
       browser: params.browser,
       takesTime: params.took,

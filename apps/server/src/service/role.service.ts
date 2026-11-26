@@ -605,8 +605,6 @@ export async function saveRoleApiPermissions(
       .from(sysRoles)
       .where(eq(sysRoles.id, id))
       .for("update");
-    if (!role) throw { code: 10003, message: "角色不存在", status: 404 };
-    assertMutableRole(role.code);
 
     const requestedIds = [...new Set(apiPermissionIds)];
     // Serialize with catalog edits before deciding which endpoint IDs to grant.

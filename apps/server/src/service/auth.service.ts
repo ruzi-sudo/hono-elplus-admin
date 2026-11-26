@@ -30,6 +30,7 @@ import {
   replaceUserCredential,
   storeUserCredential,
 } from "./redis.service";
+import { isPublicIp, lookupIpAddress } from "./ip.service";
 
 function formatExpires(expiresAt: Date): string {
   return expiresAt.toISOString().replace("T", " ").slice(0, 19);
@@ -353,33 +354,6 @@ export async function login(
     }
 
     const ip = clientInfo?.ip || "127.0.0.1";
-    // 异步查询 IP 归属地，不阻塞登录
-    let address = "";
-    const isPrivate =
-      /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$)/.test(ip);
-    if (ip && !isPrivate) {
-      lookupIpAddress(ip)
-        .then((addr) => {
-          if (addr) {
-            getDb()
-              .then((db) =>
-                db
-                  .update(sysOnlineUsers)
-                  .set({ address: addr } as Partial<
-                    typeof sysOnlineUsers.$inferInsert
-                  >)
-                  .where(
-                    and(
-                      eq(sysOnlineUsers.username, user.username),
-                      eq(sysOnlineUsers.ip, ip),
-                    ),
-                  ),
-              )
-              .catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
 
     const [onlineUser] = await db
       .insert(sysOnlineUsers)
@@ -387,7 +361,7 @@ export async function login(
         userId: user.id,
         username: user.username,
         ip,
-        address,
+        address: "",
         system,
         browser,
         loginTime: new Date(),
@@ -405,17 +379,45 @@ export async function login(
       });
     }
 
-    // 写入登录日志
-    await db.insert(sysLoginLogs).values({
-      userId: user.id,
-      username: user.username,
-      ip,
-      address,
-      system,
-      browser,
-      status: 1,
-      loginTime: new Date(),
-    } as typeof sysLoginLogs.$inferInsert);
+    const [loginLog] = await db
+      .insert(sysLoginLogs)
+      .values({
+        userId: user.id,
+        username: user.username,
+        ip,
+        address: "",
+        system,
+        browser,
+        status: 1,
+        loginTime: new Date(),
+      } as typeof sysLoginLogs.$inferInsert)
+      .$returningId();
+
+    if (isPublicIp(ip)) {
+      void lookupIpAddress(ip)
+        .then((address) => {
+          if (!address) return;
+          void getDb()
+            .then((addressDb) =>
+              Promise.all([
+                onlineUser?.id
+                  ? addressDb
+                      .update(sysOnlineUsers)
+                      .set({ address } as Partial<typeof sysOnlineUsers.$inferInsert>)
+                      .where(eq(sysOnlineUsers.id, onlineUser.id))
+                  : Promise.resolve(),
+                loginLog?.id
+                  ? addressDb
+                      .update(sysLoginLogs)
+                      .set({ address } as Partial<typeof sysLoginLogs.$inferInsert>)
+                      .where(eq(sysLoginLogs.id, loginLog.id))
+                  : Promise.resolve(),
+              ]),
+            )
+            .catch(() => {});
+        })
+        .catch(() => {});
+    }
   } catch {
     /* 非关键 */
   }
@@ -524,24 +526,3 @@ export async function refreshToken(token: string, request: Request) {
   };
 }
 
-/** 通过 ip-api.com 免费接口查询 IP 归属地（中国区可正常返回中文地址） */
-async function lookupIpAddress(ip: string): Promise<string> {
-  try {
-    const res = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return "";
-    const data = (await res.json()) as {
-      status: string;
-      country: string;
-      regionName: string;
-      city: string;
-    };
-    if (data.status === "success") {
-      return `${data.country}${data.regionName}${data.city}`;
-    }
-  } catch {
-    /* 超时或失败时跳过 */
-  }
-  return "";
-}
