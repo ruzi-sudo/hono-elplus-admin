@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import { useUserStoreHook } from "@/store/modules/user";
 import { storageLocal, isString, isIncludeAllChildren } from "@pureadmin/utils";
+import { getAsyncRoutesCacheKey } from "@/router/async-route-cache";
 
 export interface DataInfo<T> {
   /** token */
@@ -70,7 +71,18 @@ export function setToken(data: DataInfo<Date>) {
       : {},
   );
 
-  function setUserKey({ avatar, username, nickname, roles, permissions, apiPermissions }) {
+  function setUserKey({
+    avatar,
+    username,
+    nickname,
+    roles,
+    permissions,
+    apiPermissions,
+  }) {
+    const previousUser = storageLocal().getItem<DataInfo<number>>(userKey);
+    if (previousUser?.username && previousUser.username !== username) {
+      storageLocal().removeItem(getAsyncRoutesCacheKey(previousUser.username));
+    }
     useUserStoreHook().SET_AVATAR(avatar);
     useUserStoreHook().SET_USERNAME(username);
     useUserStoreHook().SET_NICKNAME(nickname);
@@ -125,6 +137,10 @@ export function setToken(data: DataInfo<Date>) {
 
 /** 删除`token`以及key值为`user-info`的localStorage信息 */
 export function removeToken() {
+  const currentUser = storageLocal().getItem<DataInfo<number>>(userKey);
+  if (currentUser?.username) {
+    storageLocal().removeItem(getAsyncRoutesCacheKey(currentUser.username));
+  }
   Cookies.remove(TokenKey);
   Cookies.remove(multipleTabsKey);
   storageLocal().removeItem(userKey);
