@@ -1,4 +1,5 @@
 import { mysqlTable, int, varchar, tinyint, text, datetime, index } from 'drizzle-orm/mysql-core';
+import { sql } from 'drizzle-orm';
 
 export const sysLoginLogs = mysqlTable('sys_login_logs', {
   id: int('id').primaryKey().autoincrement(),
@@ -9,7 +10,7 @@ export const sysLoginLogs = mysqlTable('sys_login_logs', {
   system: varchar('system', { length: 64 }),
   browser: varchar('browser', { length: 64 }),
   status: tinyint('status').default(1),
-  loginTime: datetime('login_time', { mode: 'date' }).default(new Date()),
+  loginTime: datetime('login_time', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
   usernameIdx: index('idx_login_logs_username').on(table.username),
 }));
@@ -31,7 +32,7 @@ export const sysSystemLogs = mysqlTable('sys_system_logs', {
   browser: varchar('browser', { length: 64 }),
   takesTime: int('takes_time').default(0),
   status: tinyint('status').default(0),
-  createdAt: datetime('created_at', { mode: 'date' }).default(new Date()),
+  createdAt: datetime('created_at', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
   usernameIdx: index('idx_system_logs_username').on(table.username),
   moduleIdx: index('idx_system_logs_module').on(table.module),
@@ -59,7 +60,7 @@ export const sysOnlineUsers = mysqlTable('sys_online_users', {
   address: varchar('address', { length: 128 }),
   system: varchar('system', { length: 64 }),
   browser: varchar('browser', { length: 64 }),
-  loginTime: datetime('login_time', { mode: 'date' }).default(new Date()),
+  loginTime: datetime('login_time', { mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
   usernameIdx: index('idx_online_users_username').on(table.username),
 }));
