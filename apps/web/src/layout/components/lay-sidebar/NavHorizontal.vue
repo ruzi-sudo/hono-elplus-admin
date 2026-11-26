@@ -117,7 +117,9 @@ onMounted(() => {
       <!-- 退出登录 -->
       <el-dropdown trigger="click">
         <span class="el-dropdown-link navbar-bg-hover">
-          <img :src="userAvatar" :style="avatarsStyle" />
+          <el-avatar :size="22" :style="avatarsStyle">
+            {{ userAvatar }}
+          </el-avatar>
           <p v-if="username" class="dark:text-white">{{ username }}</p>
         </span>
         <template #dropdown>

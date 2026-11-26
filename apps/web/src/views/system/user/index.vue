@@ -5,7 +5,6 @@ import { PureTableBar } from "@/components/RePureTableBar";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { hasAnyPerms } from "@/utils/auth";
 
-import Upload from "~icons/ri/upload-line";
 import Password from "~icons/ri/lock-password-line";
 import More from "~icons/ep/more-filled";
 import Delete from "~icons/ep/delete";
@@ -35,7 +34,6 @@ const {
   onbatchDel,
   openDialog,
   handleDelete,
-  handleUpload,
   handleReset,
   handleSizeChange,
   onSelectionCancel,
@@ -185,14 +183,7 @@ const {
                   </template>
                 </el-popconfirm>
               </Auth>
-              <el-dropdown
-                v-if="
-                  hasAnyPerms([
-                    'system-user:upload-avatar',
-                    'system-user:reset-password',
-                  ])
-                "
-              >
+              <el-dropdown v-if="hasAnyPerms(['system-user:reset-password'])">
                 <el-button
                   class="ml-3! mt-0.5!"
                   link
@@ -202,20 +193,6 @@ const {
                 />
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <Auth value="system-user:upload-avatar">
-                      <el-dropdown-item>
-                        <el-button
-                          :class="buttonClass"
-                          link
-                          type="primary"
-                          :size="size"
-                          :icon="useRenderIcon(Upload)"
-                          @click="handleUpload(row)"
-                        >
-                          上传头像
-                        </el-button>
-                      </el-dropdown-item>
-                    </Auth>
                     <Auth value="system-user:reset-password">
                       <el-dropdown-item>
                         <el-button

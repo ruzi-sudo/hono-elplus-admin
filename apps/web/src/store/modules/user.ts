@@ -19,8 +19,6 @@ import { type DataInfo, setToken, removeToken, userKey } from "@/utils/auth";
 
 export const useUserStore = defineStore("pure-user", {
   state: (): userType => ({
-    // 头像
-    avatar: storageLocal().getItem<DataInfo<number>>(userKey)?.avatar ?? "",
     // 用户名
     username: storageLocal().getItem<DataInfo<number>>(userKey)?.username ?? "",
     // 昵称
@@ -43,10 +41,6 @@ export const useUserStore = defineStore("pure-user", {
     loginDay: 7,
   }),
   actions: {
-    /** 存储头像 */
-    SET_AVATAR(avatar: string) {
-      this.avatar = avatar;
-    },
     /** 存储用户名 */
     SET_USERNAME(username: string) {
       this.username = username;
@@ -102,7 +96,11 @@ export const useUserStore = defineStore("pure-user", {
     },
     /** 前端登出（调用后端接口清除在线用户记录） */
     async logOut() {
-      try { await logoutApi(); } catch { /* ignore */ }
+      try {
+        await logoutApi();
+      } catch {
+        /* ignore */
+      }
       this.clearLoginState();
     },
     /** 清理本地登录状态并回到登录页 */

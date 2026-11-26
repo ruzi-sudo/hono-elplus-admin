@@ -4,8 +4,6 @@ export type UserResult = {
   code: number;
   message: string;
   data: {
-    /** 头像 */
-    avatar: string;
     /** 用户名 */
     username: string;
     /** 当前登录用户的角色 */
@@ -40,8 +38,6 @@ export type RefreshTokenResult = {
 export type UserInfo = {
   /** 用户ID */
   id: number;
-  /** 头像 */
-  avatar: string;
   /** 用户名 */
   username: string;
   /** 邮箱 */
@@ -107,20 +103,4 @@ export const updateMine = (data?: object) => {
 /** 更新当前登录用户的密码 */
 export const resetMinePassword = (data?: object) => {
   return http.request<Result>("post", "/api/mine/reset-password", { data });
-};
-
-/** 上传当前登录用户的头像 */
-export const uploadMineAvatar = (data: FormData) => {
-  return http.request<Result>("post", "/api/mine/upload/avatar", {
-    data,
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-};
-
-/** 上传头像 */
-export const uploadAvatar = (data: FormData) => {
-  return http.request<Result>("post", "/api/upload/avatar", {
-    data,
-    headers: { "Content-Type": "multipart/form-data" },
-  });
 };

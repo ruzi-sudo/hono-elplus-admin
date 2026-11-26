@@ -6,30 +6,21 @@ import {
   getMine,
   resetMinePassword,
   updateMine,
-  uploadMineAvatar,
 } from "@/api/user";
 import type { FormInstance, FormRules } from "element-plus";
-import ReCropperPreview from "@/components/ReCropperPreview";
-import { createFormData, deviceDetection } from "@pureadmin/utils";
-import uploadLine from "~icons/ri/upload-line";
+import { deviceDetection } from "@pureadmin/utils";
 import { useUserStoreHook } from "@/store/modules/user";
 
 defineOptions({
   name: "Profile",
 });
 
-const imgSrc = ref("");
-const cropperBlob = ref();
-const cropRef = ref();
-const uploadRef = ref();
-const isShow = ref(false);
 const passwordDialogVisible = ref(false);
 const userInfoFormRef = ref<FormInstance>();
 const passwordFormRef = ref<FormInstance>();
 
 const userInfos = reactive({
   id: null as number | null,
-  avatar: "",
   username: "",
   email: "",
   roleIds: [] as number[],
@@ -77,48 +68,6 @@ const passwordRules = reactive<FormRules>({
     },
   ],
 });
-
-const onChange = (uploadFile) => {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    imgSrc.value = e.target.result as string;
-    isShow.value = true;
-  };
-  reader.readAsDataURL(uploadFile.raw);
-};
-
-const handleClose = () => {
-  cropRef.value.hidePopover();
-  uploadRef.value.clearFiles();
-  isShow.value = false;
-};
-
-const onCropper = ({ blob }) => (cropperBlob.value = blob);
-
-const handleSubmitImage = async () => {
-  if (!userInfos.id) return;
-  const formData = createFormData({
-    file: new File([cropperBlob.value], "avatar.png", { type: "image/png" }),
-  });
-  try {
-    const { code, data, message: msg } = await uploadMineAvatar(formData);
-    if (code !== 0) {
-      message(msg || "上传头像失败", { type: "error" });
-      return;
-    }
-    const avatar = data?.url;
-    const result = await updateMine({ avatar });
-    if (result.code !== 0) {
-      message(result.message || "更新头像失败", { type: "error" });
-      return;
-    }
-    userInfos.avatar = avatar;
-    message("更新头像成功", { type: "success" });
-    handleClose();
-  } catch (error) {
-    message(`提交异常 ${error}`, { type: "error" });
-  }
-};
 
 // 更新信息
 const onSubmit = async (formEl: FormInstance) => {
@@ -183,21 +132,9 @@ onMounted(async () => {
       :model="userInfos"
     >
       <el-form-item label="头像">
-        <el-avatar :size="80" :src="userInfos.avatar" />
-        <el-upload
-          ref="uploadRef"
-          accept="image/*"
-          action="#"
-          :limit="1"
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-change="onChange"
-        >
-          <el-button plain class="ml-4!">
-            <IconifyIconOffline :icon="uploadLine" />
-            <span class="ml-2">更新头像</span>
-          </el-button>
-        </el-upload>
+        <el-avatar :size="80">
+          {{ Array.from(userInfos.username.trim() || "?")[0].toUpperCase() }}
+        </el-avatar>
       </el-form-item>
       <el-form-item label="用户名" prop="username">
         <el-input v-model="userInfos.username" placeholder="请输入用户名" />
@@ -240,25 +177,6 @@ onMounted(async () => {
       </el-button>
       <el-button @click="openPasswordDialog">重置密码</el-button>
     </el-form>
-    <el-dialog
-      v-model="isShow"
-      width="40%"
-      title="编辑头像"
-      destroy-on-close
-      :closeOnClickModal="false"
-      :before-close="handleClose"
-      :fullscreen="deviceDetection()"
-    >
-      <ReCropperPreview ref="cropRef" :imgSrc="imgSrc" @cropper="onCropper" />
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button bg text @click="handleClose">取消</el-button>
-          <el-button bg text type="primary" @click="handleSubmitImage">
-            确定
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
     <el-dialog
       v-model="passwordDialogVisible"
       width="30%"

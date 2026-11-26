@@ -23,7 +23,6 @@ onBeforeMount(() => {
 });
 
 const userInfo = ref({
-  avatar: "",
   username: "",
 });
 const panes = [
@@ -64,7 +63,9 @@ onMounted(async () => {
           </div>
         </div>
         <div class="flex items-center ml-8 my-4">
-          <el-avatar :size="48" :src="userInfo.avatar" />
+          <el-avatar :size="48">
+            {{ Array.from(userInfo.username.trim() || "?")[0].toUpperCase() }}
+          </el-avatar>
           <div class="ml-4 flex flex-col max-w-32.5">
             <ReText class="font-bold self-baseline!">
               {{ userInfo.username }}

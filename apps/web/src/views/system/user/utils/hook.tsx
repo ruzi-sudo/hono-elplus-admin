@@ -3,12 +3,10 @@ import dayjs from "dayjs";
 import editForm from "../form/index.vue";
 import { zxcvbn } from "@zxcvbn-ts/core";
 import { message } from "@/utils/message";
-import userAvatar from "@/assets/user.jpg";
 import { usePublicHooks } from "../../hooks";
 import { addDialog } from "@/components/ReDialog";
 import { hasPerms } from "@/utils/auth";
 import type { PaginationProps } from "@pureadmin/table";
-import ReCropperPreview from "@/components/ReCropperPreview";
 import type { FormItemProps } from "../utils/types";
 import {
   getKeyList,
@@ -342,27 +340,6 @@ export function useUser(tableRef: Ref) {
     });
   }
 
-  const cropRef = ref();
-  /** 上传头像 */
-  function handleUpload(row) {
-    addDialog({
-      title: "裁剪、上传头像",
-      width: "40%",
-      closeOnClickModal: false,
-      fullscreen: deviceDetection(),
-      contentRenderer: () =>
-        h(ReCropperPreview, {
-          ref: cropRef,
-          imgSrc: row.avatar || userAvatar,
-        }),
-      beforeSure: (done) => {
-        done(); // 关闭弹框
-        onSearch(); // 刷新表格数据
-      },
-      closeCallBack: () => cropRef.value.hidePopover(),
-    });
-  }
-
   watch(
     pwdForm,
     ({ newPwd }) =>
@@ -466,7 +443,6 @@ export function useUser(tableRef: Ref) {
     onbatchDel,
     openDialog,
     handleDelete,
-    handleUpload,
     handleReset,
     handleSizeChange,
     onSelectionCancel,

@@ -10,8 +10,6 @@ export interface DataInfo<T> {
   expires: T;
   /** 用于调用刷新accessToken的接口时所需的token */
   refreshToken: string;
-  /** 头像 */
-  avatar?: string;
   /** 用户名 */
   username?: string;
   /** 昵称 */
@@ -46,7 +44,7 @@ export function getToken(): DataInfo<number> {
  * @description 设置`token`以及一些必要信息并采用无感刷新`token`方案
  * 无感刷新：后端返回`accessToken`（访问接口使用的`token`）、`refreshToken`（用于调用刷新`accessToken`的接口时所需的`token`，`refreshToken`的过期时间（比如30天）应大于`accessToken`的过期时间（比如2小时））、`expires`（`accessToken`的过期时间）
  * 将`accessToken`、`expires`、`refreshToken`这三条信息放在key值为authorized-token的cookie里（过期自动销毁）
- * 将`avatar`、`username`、`nickname`、`roles`、`permissions`、`refreshToken`、`expires`这七条信息放在key值为`user-info`的localStorage里（利用`multipleTabsKey`当浏览器完全关闭后自动销毁）
+ * 将`username`、`nickname`、`roles`、`permissions`、`apiPermissions`、`refreshToken`、`expires`信息放在key值为`user-info`的localStorage里（利用`multipleTabsKey`当浏览器完全关闭后自动销毁）
  */
 export function setToken(data: DataInfo<Date>) {
   let expires = 0;
@@ -72,7 +70,6 @@ export function setToken(data: DataInfo<Date>) {
   );
 
   function setUserKey({
-    avatar,
     username,
     nickname,
     roles,
@@ -83,7 +80,6 @@ export function setToken(data: DataInfo<Date>) {
     if (previousUser?.username && previousUser.username !== username) {
       storageLocal().removeItem(getAsyncRoutesCacheKey(previousUser.username));
     }
-    useUserStoreHook().SET_AVATAR(avatar);
     useUserStoreHook().SET_USERNAME(username);
     useUserStoreHook().SET_NICKNAME(nickname);
     useUserStoreHook().SET_ROLES(roles);
@@ -92,7 +88,6 @@ export function setToken(data: DataInfo<Date>) {
     storageLocal().setItem(userKey, {
       refreshToken,
       expires,
-      avatar,
       username,
       nickname,
       roles,
@@ -104,7 +99,6 @@ export function setToken(data: DataInfo<Date>) {
   if (data.username && data.roles) {
     const { username, roles } = data;
     setUserKey({
-      avatar: data?.avatar ?? "",
       username,
       nickname: data?.nickname ?? "",
       roles,
@@ -112,8 +106,6 @@ export function setToken(data: DataInfo<Date>) {
       apiPermissions: data?.apiPermissions ?? [],
     });
   } else {
-    const avatar =
-      storageLocal().getItem<DataInfo<number>>(userKey)?.avatar ?? "";
     const username =
       storageLocal().getItem<DataInfo<number>>(userKey)?.username ?? "";
     const nickname =
@@ -125,7 +117,6 @@ export function setToken(data: DataInfo<Date>) {
     const apiPermissions =
       storageLocal().getItem<DataInfo<number>>(userKey)?.apiPermissions ?? [];
     setUserKey({
-      avatar,
       username,
       nickname,
       roles,
