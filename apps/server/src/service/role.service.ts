@@ -1,4 +1,4 @@
-import { eq, like, and, count, desc, inArray } from "drizzle-orm";
+import { eq, like, and, count, asc, desc, inArray } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { getDb } from "../db";
 import {
@@ -14,6 +14,7 @@ import type * as schema from "../db/schema";
 import { ForbiddenException, ParamsException } from "../common/exception";
 import type { AuthenticatedUser } from "../middlewares/auth";
 import { isSystemAdmin } from "../middlewares/rbac";
+import { resolveSort } from "./list-sort";
 
 const PROTECTED_ROLE_CODES = new Set(["admin", "common"]);
 
@@ -339,6 +340,8 @@ export async function listRoles(params: {
   code?: string | string[];
   pageNum: number;
   pageSize: number;
+  sortBy?: string;
+  sortOrder?: string;
 }) {
   const db = await getDb();
   const { pageNum, pageSize } = params;
@@ -360,6 +363,7 @@ export async function listRoles(params: {
     .where(whereClause);
 
   const offset = (pageNum - 1) * pageSize;
+  const sort = resolveSort(params.sortBy, params.sortOrder, ["createTime"], "id");
   const roles = await db
     .select({
       id: sysRoles.id,
@@ -372,7 +376,16 @@ export async function listRoles(params: {
     })
     .from(sysRoles)
     .where(whereClause)
-    .orderBy(desc(sysRoles.id))
+    .orderBy(
+      sort.field === "id"
+        ? desc(sysRoles.id)
+        : sort.direction === "asc"
+          ? asc(sysRoles.createdAt)
+          : desc(sysRoles.createdAt),
+      ...(sort.field === "id"
+        ? []
+        : [sort.direction === "asc" ? asc(sysRoles.id) : desc(sysRoles.id)]),
+    )
     .limit(pageSize)
     .offset(offset);
 

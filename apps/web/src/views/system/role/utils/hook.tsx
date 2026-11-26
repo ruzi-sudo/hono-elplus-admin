@@ -78,6 +78,7 @@ export function useRole(treeRef: Ref) {
     currentPage: 1,
     background: true,
   });
+  const sortState = reactive<{ sortBy?: "createTime"; sortOrder?: "asc" | "desc" }>({});
   const columns: TableColumnList = [
     {
       label: "角色编号",
@@ -118,6 +119,8 @@ export function useRole(treeRef: Ref) {
       label: "创建时间",
       prop: "createTime",
       minWidth: 160,
+      sortable: "custom",
+      sortOrders: ["ascending", "descending"],
       formatter: ({ createTime }) =>
         dayjs(createTime).format("YYYY-MM-DD HH:mm:ss"),
     },
@@ -194,10 +197,18 @@ export function useRole(treeRef: Ref) {
     onSearch();
   }
 
+  function handleSortChange({ prop, order }) {
+    sortState.sortBy = order ? prop : undefined;
+    sortState.sortOrder = order === "ascending" ? "asc" : order === "descending" ? "desc" : undefined;
+    pagination.currentPage = 1;
+    onSearch();
+  }
+
   async function onSearch() {
     loading.value = true;
     const { code, data } = await getRoleList({
       ...toRaw(form),
+      ...sortState,
       pageNum: pagination.currentPage,
       pageSize: pagination.pageSize,
     });
@@ -457,5 +468,6 @@ export function useRole(treeRef: Ref) {
     // handleDatabase,
     handleSizeChange,
     handleCurrentChange,
+    handleSortChange,
   };
 }

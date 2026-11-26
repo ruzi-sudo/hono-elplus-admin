@@ -23,6 +23,7 @@ const {
   handleOffline,
   handleSizeChange,
   handleCurrentChange,
+  handleSortChange,
 } = useRole();
 </script>
 
@@ -76,6 +77,7 @@ const {
           }"
           @page-size-change="handleSizeChange"
           @page-current-change="handleCurrentChange"
+          @sort-change="handleSortChange"
         >
           <template #operation="{ row }">
             <Auth value="online-user:force-logout">

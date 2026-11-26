@@ -29,6 +29,7 @@ const {
   handleSizeChange,
   onSelectionCancel,
   handleCurrentChange,
+  handleSortChange,
   handleSelectionChange,
 } = useRole(tableRef);
 </script>
@@ -143,6 +144,7 @@ const {
           @selection-change="handleSelectionChange"
           @page-size-change="handleSizeChange"
           @page-current-change="handleCurrentChange"
+          @sort-change="handleSortChange"
         />
       </template>
     </PureTableBar>

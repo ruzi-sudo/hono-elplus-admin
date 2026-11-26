@@ -12,6 +12,8 @@ export const ListRolesQuerySchema = z.object({
     .union([z.string(), z.array(z.string())])
     .optional()
     .openapi({ example: "admin" }),
+  sortBy: z.enum(["createTime"]).optional().openapi({ example: "createTime" }),
+  sortOrder: z.enum(["asc", "desc"]).optional().openapi({ example: "desc" }),
   pageNum: z.coerce.number().positive().int().default(1),
   pageSize: z.coerce.number().positive().int().default(10),
 });

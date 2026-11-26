@@ -38,6 +38,7 @@ const {
   handleSizeChange,
   onSelectionCancel,
   handleCurrentChange,
+  handleSortChange,
   handleSelectionChange,
 } = useUser(tableRef);
 </script>
@@ -151,6 +152,7 @@ const {
             @selection-change="handleSelectionChange"
             @page-size-change="handleSizeChange"
             @page-current-change="handleCurrentChange"
+            @sort-change="handleSortChange"
           >
             <template #operation="{ row }">
               <Auth value="system-user:edit">

@@ -32,6 +32,7 @@ const {
   onSelectionCancel,
   handleCellDblclick,
   handleCurrentChange,
+  handleSortChange,
   handleSelectionChange,
 } = useRole(tableRef);
 </script>
@@ -135,6 +136,7 @@ const {
           @selection-change="handleSelectionChange"
           @page-size-change="handleSizeChange"
           @page-current-change="handleCurrentChange"
+          @sort-change="handleSortChange"
           @cell-dblclick="handleCellDblclick"
         >
           <template #operation="{ row }">

@@ -80,6 +80,7 @@ const {
   // handleDatabase,
   handleSizeChange,
   handleCurrentChange,
+  handleSortChange,
 } = useRole(treeRef);
 
 onMounted(() => {
@@ -195,6 +196,7 @@ onMounted(() => {
             }"
             @page-size-change="handleSizeChange"
             @page-current-change="handleCurrentChange"
+            @sort-change="handleSortChange"
           >
             <template #operation="{ row }">
               <Auth value="system-role:edit">

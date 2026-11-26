@@ -11,6 +11,8 @@ export type ResultTable<T> = Result<{
   currentPage: number;
 }>;
 
+export type SortOrder = "asc" | "desc";
+
 export type IdResult = Result<{ id: number }>;
 export type OperationResult = Result<Record<string, unknown>>;
 
@@ -18,6 +20,8 @@ export type UserListQuery = {
   username?: string;
   status?: number | string;
   email?: string | null;
+  sortBy?: "createTime";
+  sortOrder?: SortOrder;
   pageNum?: number;
   pageSize?: number;
 };
@@ -62,6 +66,8 @@ export type RoleListQuery = {
   name?: string;
   status?: number | string;
   code?: string | string[];
+  sortBy?: "createTime";
+  sortOrder?: SortOrder;
   pageNum?: number;
   pageSize?: number;
 };
@@ -207,6 +213,8 @@ export type MonitorListQuery = {
   username?: string;
   status?: number | string;
   module?: string;
+  sortBy?: "loginTime" | "requestTime";
+  sortOrder?: SortOrder;
   pageNum?: number;
   pageSize?: number;
 };

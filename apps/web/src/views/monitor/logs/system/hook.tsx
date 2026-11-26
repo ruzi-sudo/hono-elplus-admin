@@ -24,6 +24,7 @@ export function useRole(tableRef: Ref) {
     currentPage: 1,
     background: true,
   });
+  const sortState = reactive<{ sortBy?: "requestTime"; sortOrder?: "asc" | "desc" }>({});
 
   // const getLevelType = (type, text = false) => {
   //   switch (type) {
@@ -131,6 +132,8 @@ export function useRole(tableRef: Ref) {
       label: "请求时间",
       prop: "requestTime",
       minWidth: 180,
+      sortable: "custom",
+      sortOrders: ["ascending", "descending"],
       formatter: ({ requestTime }) =>
         dayjs(requestTime).format("YYYY-MM-DD HH:mm:ss"),
     },
@@ -149,6 +152,13 @@ export function useRole(tableRef: Ref) {
 
   function handleCurrentChange(val: number) {
     pagination.currentPage = val;
+    onSearch();
+  }
+
+  function handleSortChange({ prop, order }) {
+    sortState.sortBy = order ? prop : undefined;
+    sortState.sortOrder = order === "ascending" ? "asc" : order === "descending" ? "desc" : undefined;
+    pagination.currentPage = 1;
     onSearch();
   }
 
@@ -213,7 +223,7 @@ export function useRole(tableRef: Ref) {
 
   async function onSearch() {
     loading.value = true;
-    const { code, data } = await getSystemLogsList({ ...toRaw(form), pageNum: pagination.currentPage, pageSize: pagination.pageSize });
+    const { code, data } = await getSystemLogsList({ ...toRaw(form), ...sortState, pageNum: pagination.currentPage, pageSize: pagination.pageSize });
     if (code === 0) {
       dataList.value = data.list;
       pagination.total = data.total;
@@ -252,6 +262,7 @@ export function useRole(tableRef: Ref) {
     onSelectionCancel,
     handleCellDblclick,
     handleCurrentChange,
+    handleSortChange,
     handleSelectionChange,
   };
 }

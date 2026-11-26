@@ -1,4 +1,4 @@
-import { eq, like, and, count, desc, inArray } from 'drizzle-orm';
+import { eq, like, and, count, asc, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../db';
 import {
   sysLoginLogs,
@@ -7,8 +7,9 @@ import {
   sysOnlineUsers,
 } from '../db/schema';
 import { removeUserCredentialByOnlineUserId } from './redis.service';
+import { resolveSort } from './list-sort';
 
-export async function listOnlineUsers(params: { username?: string; pageNum: number; pageSize: number }) {
+export async function listOnlineUsers(params: { username?: string; pageNum: number; pageSize: number; sortBy?: string; sortOrder?: string }) {
   const db = await getDb();
   const { pageNum, pageSize } = params;
 
@@ -20,11 +21,17 @@ export async function listOnlineUsers(params: { username?: string; pageNum: numb
     .where(whereClause);
 
   const offset = (pageNum - 1) * pageSize;
+  const sort = resolveSort(params.sortBy, params.sortOrder, ["loginTime"], "loginTime");
   const rows = await db
     .select()
     .from(sysOnlineUsers)
     .where(whereClause)
-    .orderBy(desc(sysOnlineUsers.loginTime))
+    .orderBy(
+      sort.direction === 'asc'
+          ? asc(sysOnlineUsers.loginTime)
+          : desc(sysOnlineUsers.loginTime),
+      sort.direction === 'asc' ? asc(sysOnlineUsers.id) : desc(sysOnlineUsers.id),
+    )
     .limit(pageSize)
     .offset(offset);
 
@@ -42,7 +49,7 @@ export async function listOnlineUsers(params: { username?: string; pageNum: numb
   return { list, total, pageSize, currentPage: pageNum };
 }
 
-export async function listLoginLogs(params: { username?: string; status?: number; pageNum: number; pageSize: number }) {
+export async function listLoginLogs(params: { username?: string; status?: number; pageNum: number; pageSize: number; sortBy?: string; sortOrder?: string }) {
   const db = await getDb();
   const { pageNum, pageSize } = params;
 
@@ -58,11 +65,17 @@ export async function listLoginLogs(params: { username?: string; status?: number
     .where(whereClause);
 
   const offset = (pageNum - 1) * pageSize;
+  const sort = resolveSort(params.sortBy, params.sortOrder, ["loginTime"], "loginTime");
   const rows = await db
     .select()
     .from(sysLoginLogs)
     .where(whereClause)
-    .orderBy(desc(sysLoginLogs.loginTime))
+    .orderBy(
+      sort.direction === 'asc'
+          ? asc(sysLoginLogs.loginTime)
+          : desc(sysLoginLogs.loginTime),
+      sort.direction === 'asc' ? asc(sysLoginLogs.id) : desc(sysLoginLogs.id),
+    )
     .limit(pageSize)
     .offset(offset);
 
@@ -82,7 +95,7 @@ export async function listLoginLogs(params: { username?: string; status?: number
   return { list, total, pageSize, currentPage: pageNum };
 }
 
-export async function listSystemLogs(params: { module?: string; pageNum: number; pageSize: number }) {
+export async function listSystemLogs(params: { module?: string; pageNum: number; pageSize: number; sortBy?: string; sortOrder?: string }) {
   const db = await getDb();
   const { pageNum, pageSize } = params;
 
@@ -94,11 +107,17 @@ export async function listSystemLogs(params: { module?: string; pageNum: number;
     .where(whereClause);
 
   const offset = (pageNum - 1) * pageSize;
+  const sort = resolveSort(params.sortBy, params.sortOrder, ["requestTime"], "requestTime");
   const rows = await db
     .select()
     .from(sysSystemLogs)
     .where(whereClause)
-    .orderBy(desc(sysSystemLogs.createdAt))
+    .orderBy(
+      sort.direction === 'asc'
+          ? asc(sysSystemLogs.createdAt)
+          : desc(sysSystemLogs.createdAt),
+      sort.direction === 'asc' ? asc(sysSystemLogs.id) : desc(sysSystemLogs.id),
+    )
     .limit(pageSize)
     .offset(offset);
 

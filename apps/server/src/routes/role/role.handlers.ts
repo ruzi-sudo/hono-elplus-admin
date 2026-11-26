@@ -16,6 +16,8 @@ route.openapi(routes.listRoles, async (c) => {
     name: body.name,
     status: body.status,
     code: body.code,
+    sortBy: body.sortBy,
+    sortOrder: body.sortOrder,
     pageNum: body.pageNum,
     pageSize: body.pageSize,
   });

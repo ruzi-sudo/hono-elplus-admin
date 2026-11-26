@@ -1,6 +1,11 @@
 import { z } from "@hono/zod-openapi";
 import { createRoute } from "@hono/zod-openapi";
-import { ListQuerySchema, DetailQuerySchema } from "./monitor.schemas";
+import {
+  OnlineListQuerySchema,
+  LoginListQuerySchema,
+  SystemListQuerySchema,
+  DetailQuerySchema,
+} from "./monitor.schemas";
 import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
 
 export const onlineLogs = createRoute({
@@ -8,7 +13,7 @@ export const onlineLogs = createRoute({
   path: "/online-logs",
   tags: ["monitor"],
   request: {
-    body: { content: { "application/json": { schema: ListQuerySchema } } },
+    body: { content: { "application/json": { schema: OnlineListQuerySchema } } },
   },
   responses: {
     "200": { description: "在线用户列表" },
@@ -25,7 +30,7 @@ export const loginLogs = createRoute({
   path: "/login-logs",
   tags: ["monitor"],
   request: {
-    body: { content: { "application/json": { schema: ListQuerySchema } } },
+    body: { content: { "application/json": { schema: LoginListQuerySchema } } },
   },
   responses: {
     "200": { description: "登录日志列表" },
@@ -42,7 +47,7 @@ export const systemLogs = createRoute({
   path: "/system-logs",
   tags: ["monitor"],
   request: {
-    body: { content: { "application/json": { schema: ListQuerySchema } } },
+    body: { content: { "application/json": { schema: SystemListQuerySchema } } },
   },
   responses: {
     "200": { description: "系统日志列表" },

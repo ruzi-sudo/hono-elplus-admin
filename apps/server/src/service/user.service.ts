@@ -1,8 +1,9 @@
-import { eq, like, and, count, desc, inArray } from 'drizzle-orm';
+import { eq, like, and, count, asc, desc, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db';
 import { sysUsers, sysUserRoles } from '../db/schema';
 import { sysRoles } from '../db/schema';
+import { resolveSort } from './list-sort';
 
 export async function listUsers(params: {
   username?: string;
@@ -10,6 +11,8 @@ export async function listUsers(params: {
   email?: string;
   pageNum: number;
   pageSize: number;
+  sortBy?: string;
+  sortOrder?: string;
 }) {
   const db = await getDb();
   const { pageNum, pageSize } = params;
@@ -27,6 +30,7 @@ export async function listUsers(params: {
     .where(whereClause);
 
   const offset = (pageNum - 1) * pageSize;
+  const sort = resolveSort(params.sortBy, params.sortOrder, ["createTime"], "id");
   const users = await db
     .select({
       id: sysUsers.id,
@@ -38,7 +42,16 @@ export async function listUsers(params: {
     })
     .from(sysUsers)
     .where(whereClause)
-    .orderBy(desc(sysUsers.id))
+    .orderBy(
+      sort.field === "id"
+        ? desc(sysUsers.id)
+        : sort.direction === 'asc'
+          ? asc(sysUsers.createdAt)
+          : desc(sysUsers.createdAt),
+      ...(sort.field === "id"
+        ? []
+        : [sort.direction === 'asc' ? asc(sysUsers.id) : desc(sysUsers.id)]),
+    )
     .limit(pageSize)
     .offset(offset);
 

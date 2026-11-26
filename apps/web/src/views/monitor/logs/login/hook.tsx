@@ -23,6 +23,7 @@ export function useRole(tableRef: Ref) {
     currentPage: 1,
     background: true,
   });
+  const sortState = reactive<{ sortBy?: "loginTime"; sortOrder?: "asc" | "desc" }>({});
   const columns: TableColumnList = [
     {
       label: "勾选列", // 如果需要表格多选，此处label必须设置
@@ -84,6 +85,8 @@ export function useRole(tableRef: Ref) {
       label: "登录时间",
       prop: "loginTime",
       minWidth: 180,
+      sortable: "custom",
+      sortOrders: ["ascending", "descending"],
       formatter: ({ loginTime }) =>
         dayjs(loginTime).format("YYYY-MM-DD HH:mm:ss"),
     },
@@ -97,6 +100,13 @@ export function useRole(tableRef: Ref) {
 
   function handleCurrentChange(val: number) {
     pagination.currentPage = val;
+    onSearch();
+  }
+
+  function handleSortChange({ prop, order }) {
+    sortState.sortBy = order ? prop : undefined;
+    sortState.sortOrder = order === "ascending" ? "asc" : order === "descending" ? "desc" : undefined;
+    pagination.currentPage = 1;
     onSearch();
   }
 
@@ -138,7 +148,7 @@ export function useRole(tableRef: Ref) {
 
   async function onSearch() {
     loading.value = true;
-    const { code, data } = await getLoginLogsList({ ...toRaw(form), pageNum: pagination.currentPage, pageSize: pagination.pageSize });
+    const { code, data } = await getLoginLogsList({ ...toRaw(form), ...sortState, pageNum: pagination.currentPage, pageSize: pagination.pageSize });
     if (code === 0) {
       dataList.value = data.list;
       pagination.total = data.total;
@@ -175,6 +185,7 @@ export function useRole(tableRef: Ref) {
     handleSizeChange,
     onSelectionCancel,
     handleCurrentChange,
+    handleSortChange,
     handleSelectionChange,
   };
 }

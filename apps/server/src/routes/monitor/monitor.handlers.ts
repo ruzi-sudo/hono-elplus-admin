@@ -13,6 +13,8 @@ route.openapi(routes.onlineLogs, async (c) => {
   const body = c.req.valid("json");
   const data = await monitorService.listOnlineUsers({
     username: body.username,
+    sortBy: body.sortBy,
+    sortOrder: body.sortOrder,
     pageNum: body.pageNum,
     pageSize: body.pageSize,
   });
@@ -24,6 +26,8 @@ route.openapi(routes.loginLogs, async (c) => {
   const data = await monitorService.listLoginLogs({
     username: body.username,
     status: body.status,
+    sortBy: body.sortBy,
+    sortOrder: body.sortOrder,
     pageNum: body.pageNum,
     pageSize: body.pageSize,
   });
@@ -34,6 +38,8 @@ route.openapi(routes.systemLogs, async (c) => {
   const body = c.req.valid("json");
   const data = await monitorService.listSystemLogs({
     module: body.module,
+    sortBy: body.sortBy,
+    sortOrder: body.sortOrder,
     pageNum: body.pageNum,
     pageSize: body.pageSize,
   });

@@ -61,6 +61,7 @@ export function useUser(tableRef: Ref) {
     currentPage: 1,
     background: true,
   });
+  const sortState = reactive<{ sortBy?: "createTime"; sortOrder?: "asc" | "desc" }>({});
   const columns: TableColumnList = [
     {
       label: "勾选列", // 如果需要表格多选，此处label必须设置
@@ -142,6 +143,8 @@ export function useUser(tableRef: Ref) {
       label: "创建时间",
       minWidth: 90,
       prop: "createTime",
+      sortable: "custom",
+      sortOrders: ["ascending", "descending"],
       formatter: ({ createTime }) =>
         dayjs(createTime).format("YYYY-MM-DD HH:mm:ss"),
     },
@@ -231,6 +234,13 @@ export function useUser(tableRef: Ref) {
     onSearch();
   }
 
+  function handleSortChange({ prop, order }) {
+    sortState.sortBy = order ? prop : undefined;
+    sortState.sortOrder = order === "ascending" ? "asc" : order === "descending" ? "desc" : undefined;
+    pagination.currentPage = 1;
+    onSearch();
+  }
+
   /** 当CheckBox选择项发生变化时会触发该事件 */
   function handleSelectionChange(val) {
     selectedNum.value = val.length;
@@ -263,6 +273,7 @@ export function useUser(tableRef: Ref) {
     loading.value = true;
     const { code, data } = await getUserList({
       ...toRaw(form),
+      ...sortState,
       pageNum: pagination.currentPage,
       pageSize: pagination.pageSize,
     });
@@ -447,6 +458,7 @@ export function useUser(tableRef: Ref) {
     handleSizeChange,
     onSelectionCancel,
     handleCurrentChange,
+    handleSortChange,
     handleSelectionChange,
   };
 }

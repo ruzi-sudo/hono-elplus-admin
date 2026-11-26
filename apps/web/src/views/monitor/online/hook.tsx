@@ -16,6 +16,7 @@ export function useRole() {
     currentPage: 1,
     background: true,
   });
+  const sortState = reactive<{ sortBy?: "loginTime"; sortOrder?: "asc" | "desc" }>({});
   const columns: TableColumnList = [
     {
       label: "序号",
@@ -56,6 +57,8 @@ export function useRole() {
       label: "登录时间",
       prop: "loginTime",
       minWidth: 180,
+      sortable: "custom",
+      sortOrders: ["ascending", "descending"],
       formatter: ({ loginTime }) =>
         dayjs(loginTime).format("YYYY-MM-DD HH:mm:ss"),
     },
@@ -78,6 +81,13 @@ export function useRole() {
     onSearch();
   }
 
+  function handleSortChange({ prop, order }) {
+    sortState.sortBy = order ? prop : undefined;
+    sortState.sortOrder = order === "ascending" ? "asc" : order === "descending" ? "desc" : undefined;
+    pagination.currentPage = 1;
+    onSearch();
+  }
+
   async function handleOffline(row) {
     const { code } = await forceOffline({ id: row.id });
     if (code === 0) {
@@ -88,7 +98,7 @@ export function useRole() {
 
   async function onSearch() {
     loading.value = true;
-    const { code, data } = await getOnlineLogsList({ ...toRaw(form), pageNum: pagination.currentPage, pageSize: pagination.pageSize });
+    const { code, data } = await getOnlineLogsList({ ...toRaw(form), ...sortState, pageNum: pagination.currentPage, pageSize: pagination.pageSize });
     if (code === 0) {
       dataList.value = data.list;
       pagination.total = data.total;
@@ -122,5 +132,6 @@ export function useRole() {
     handleOffline,
     handleSizeChange,
     handleCurrentChange,
+    handleSortChange,
   };
 }
