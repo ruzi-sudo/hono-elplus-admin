@@ -32,7 +32,6 @@ export const LoginResponseSchema = z.object({
   code: z.number(),
   message: z.string(),
   data: z.object({
-    avatar: z.string(),
     username: z.string(),
     roles: z.array(z.string()),
     permissions: z.array(z.string()),

@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS sys_users (
     id          INT PRIMARY KEY AUTO_INCREMENT COMMENT '用户ID',
     username    VARCHAR(64) UNIQUE NOT NULL COMMENT '用户名',
     password    VARCHAR(255) NOT NULL COMMENT '密码',
-    avatar      VARCHAR(512) COMMENT '头像URL',
     email       VARCHAR(128) COMMENT '邮箱',
     status      TINYINT DEFAULT 1 COMMENT '状态(1启用 0停用)',
     remark      TEXT COMMENT '备注',
@@ -288,9 +287,9 @@ INSERT IGNORE INTO sys_configs (config_key, config_value, description) VALUES
 ('CachingAsyncRoutes', 'false', '缓存动态路由');
 
 -- 密码: admin123
-INSERT IGNORE INTO sys_users (id, username, password, avatar, email, status, remark) VALUES
-(1, 'admin', '$2a$10$dvAenDGUE2prXBAKMuhpj.ALgUIIZP59GeeMp/QXqh5QonPgYsZMK', 'https://avatars.githubusercontent.com/u/44761321', 'admin@pureadmin.cn', 1, '管理员'),
-(2, 'common', '$2a$10$dvAenDGUE2prXBAKMuhpj.ALgUIIZP59GeeMp/QXqh5QonPgYsZMK', 'https://avatars.githubusercontent.com/u/52823142', 'common@pureadmin.cn', 1, '普通用户');
+INSERT IGNORE INTO sys_users (id, username, password, email, status, remark) VALUES
+(1, 'admin', '$2a$10$dvAenDGUE2prXBAKMuhpj.ALgUIIZP59GeeMp/QXqh5QonPgYsZMK', 'admin@pureadmin.cn', 1, '管理员'),
+(2, 'common', '$2a$10$dvAenDGUE2prXBAKMuhpj.ALgUIIZP59GeeMp/QXqh5QonPgYsZMK', 'common@pureadmin.cn', 1, '普通用户');
 
 INSERT IGNORE INTO sys_roles (id, name, code, status, remark) VALUES
 (1, '超级管理员', 'admin', 1, '超级管理员，拥有全部权限'),
@@ -312,7 +311,6 @@ VALUES
 ('api:user:reset-password', '重置用户密码', '用户管理', 'POST', '/user/reset-password', 60),
 ('api:user:list-roles', '查询角色选项', '用户管理', 'GET', '/list-all-role', 70),
 ('api:user:list-role-ids', '查询用户角色', '用户管理', 'POST', '/list-role-ids', 80),
-('api:user:upload-avatar', '上传用户头像', '用户管理', 'POST', '/upload/avatar', 90),
 ('api:role:list', '查询角色', '角色管理', 'POST', '/role', 10),
 ('api:role:create', '创建角色', '角色管理', 'POST', '/role/create', 20),
 ('api:role:update', '修改角色', '角色管理', 'POST', '/role/update', 30),
@@ -344,8 +342,7 @@ VALUES
 ('api:dashboard:map', '查询首页地图', '首页', 'GET', '/get-map-info', 20),
 ('api:mine:get', '查询个人信息', '个人中心', 'GET', '/mine', 10),
 ('api:mine:update', '修改个人信息', '个人中心', 'POST', '/mine/update', 20),
-('api:mine:reset-password', '修改个人密码', '个人中心', 'POST', '/mine/reset-password', 30),
-('api:mine:upload-avatar', '上传个人头像', '个人中心', 'POST', '/mine/upload/avatar', 40);
+('api:mine:reset-password', '修改个人密码', '个人中心', 'POST', '/mine/reset-password', 30);
 
 INSERT IGNORE INTO sys_role_api_permissions (role_id, api_permission_id)
 SELECT r.id, p.id
@@ -364,8 +361,7 @@ WHERE permission.code IN (
   'api:dashboard:map',
   'api:mine:get',
   'api:mine:update',
-  'api:mine:reset-password',
-  'api:mine:upload-avatar'
+  'api:mine:reset-password'
 );
 
 INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, name, path, component, `rank`, icon, auths, status) VALUES
@@ -387,9 +383,8 @@ INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, `rank`, auths, st
 (102, 6, 1, '批量删除', 2, 'system-user:batch-delete', 1),
 (103, 6, 1, '修改', 3, 'system-user:edit', 1),
 (104, 6, 1, '删除', 4, 'system-user:delete', 1),
-(105, 6, 1, '上传头像', 5, 'system-user:upload-avatar', 1),
-(106, 6, 1, '重置密码', 6, 'system-user:reset-password', 1),
-(122, 6, 1, '分配角色', 7, 'system-user:assign-role', 1),
+(106, 6, 1, '重置密码', 5, 'system-user:reset-password', 1),
+(122, 6, 1, '分配角色', 6, 'system-user:assign-role', 1),
 (107, 7, 1, '新增角色', 1, 'system-role:add', 1),
 (108, 7, 1, '修改', 2, 'system-role:edit', 1),
 (109, 7, 1, '删除', 3, 'system-role:delete', 1),

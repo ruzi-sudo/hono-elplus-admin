@@ -31,7 +31,6 @@ export async function listUsers(params: {
     .select({
       id: sysUsers.id,
       username: sysUsers.username,
-      avatar: sysUsers.avatar,
       email: sysUsers.email,
       status: sysUsers.status,
       remark: sysUsers.remark,
@@ -63,7 +62,6 @@ export async function listUsers(params: {
   const list = users.map(u => ({
     id: u.id,
     username: u.username,
-    avatar: u.avatar || '',
     email: u.email || '',
     status: u.status ?? 1,
     roleIds: rolesByUser[u.id]?.ids || [],
@@ -78,7 +76,6 @@ export async function listUsers(params: {
 export async function createUser(params: {
   username: string;
   password: string;
-  avatar?: string;
   email?: string;
   status?: number;
   roleIds?: number[];
@@ -102,7 +99,6 @@ export async function createUser(params: {
     username: params.username,
     password: hashedPassword,
     email: params.email || null,
-    avatar: params.avatar || null,
     status: params.status ?? 1,
     remark: params.remark || null,
   } as typeof sysUsers.$inferInsert);
@@ -122,7 +118,6 @@ export async function createUser(params: {
 export async function updateUser(params: {
   id: number;
   username?: string;
-  avatar?: string;
   email?: string;
   status?: number;
   roleIds?: number[];
@@ -152,7 +147,6 @@ export async function updateUser(params: {
 
   const updateData: Record<string, any> = {};
   if (params.username !== undefined) updateData.username = params.username;
-  if (params.avatar !== undefined) updateData.avatar = params.avatar;
   if (params.email !== undefined) updateData.email = params.email;
   if (params.status !== undefined) updateData.status = params.status;
   if (params.remark !== undefined) updateData.remark = params.remark;

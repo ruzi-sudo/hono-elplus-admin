@@ -3,7 +3,6 @@ import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
 import {
   ResetMinePasswordSchema,
   UpdateMineSchema,
-  UploadMineAvatarSchema,
 } from "./dashboard.schemas";
 
 export const getCardList = createRoute({
@@ -19,7 +18,6 @@ export const getCardList = createRoute({
     "403": ForbiddenResponse,
   },
 });
-
 export const getMapInfo = createRoute({
   method: "get",
   path: "/get-map-info",
@@ -90,30 +88,6 @@ export const resetMinePassword = createRoute({
     "200": { description: "更新密码成功" },
     "400": {
       description: "参数错误",
-      content: { "application/json": { schema: ErrorResponseSchema } },
-    },
-    "401": {
-      description: "未授权",
-      content: { "application/json": { schema: ErrorResponseSchema } },
-    },
-  },
-});
-
-export const uploadMineAvatar = createRoute({
-  method: "post",
-  path: "/mine/upload/avatar",
-  tags: ["dashboard"],
-  request: {
-    body: {
-      content: {
-        "multipart/form-data": { schema: UploadMineAvatarSchema },
-      },
-    },
-  },
-  responses: {
-    "200": { description: "上传头像成功" },
-    "400": {
-      description: "文件格式或大小不符合要求",
       content: { "application/json": { schema: ErrorResponseSchema } },
     },
     "401": {

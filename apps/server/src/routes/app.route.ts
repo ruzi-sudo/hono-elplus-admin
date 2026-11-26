@@ -10,7 +10,6 @@ import { route as dashboardRoute } from "./dashboard/dashboard.handlers";
 import { authMiddleware } from "../middlewares/auth";
 import { requireApiPermission } from "../middlewares/rbac";
 import { systemLogMiddleware } from "../middlewares/systemLog";
-import { avatarUploadLimitMiddleware } from "../middlewares/uploadLimit";
 import { errorHandler } from "../middlewares/error";
 import { setupOpenapi } from "../common/openapi";
 const app = new OpenAPIHono().basePath("/api");
@@ -34,8 +33,6 @@ app.use("/user/*", authMiddleware);
 app.use("/user/*", systemLogMiddleware);
 app.use("/list-all-role", authMiddleware);
 app.use("/list-role-ids", authMiddleware);
-app.use("/upload/*", authMiddleware);
-app.use("/upload/avatar", avatarUploadLimitMiddleware);
 app.use("/user", requireApiPermission());
 app.use(
   "/user/create",
@@ -59,10 +56,6 @@ app.use(
 );
 app.use("/list-all-role", requireApiPermission());
 app.use("/list-role-ids", requireApiPermission());
-app.use(
-  "/upload/avatar",
-  requireApiPermission(),
-);
 app.route("/", userRoute);
 
 app.get("/uploads/*", serveStatic({ root: "./public" }));
@@ -169,7 +162,6 @@ app.route("/", monitorRoute);
 
 // Protected routes - dashboard
 app.use("/mine/*", authMiddleware);
-app.use("/mine/upload/avatar", avatarUploadLimitMiddleware);
 app.use("/mine/*", systemLogMiddleware);
 app.use("/mine", requireApiPermission());
 app.use(
@@ -178,10 +170,6 @@ app.use(
 );
 app.use(
   "/mine/reset-password",
-  requireApiPermission(),
-);
-app.use(
-  "/mine/upload/avatar",
   requireApiPermission(),
 );
 app.use("/get-card-list", authMiddleware);

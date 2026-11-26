@@ -16,9 +16,3 @@ export const ListUsersQuerySchema = z.object({
   pageNum: z.coerce.number().positive().int().default(1),
   pageSize: z.coerce.number().positive().int().default(10),
 });
-
-export const UploadAvatarSchema = z.object({
-  file: z
-    .custom<File>((value) => value instanceof File, "请上传头像文件")
-    .openapi({ type: "string", format: "binary" }),
-});

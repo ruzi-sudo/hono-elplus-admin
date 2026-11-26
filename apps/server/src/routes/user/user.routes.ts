@@ -1,6 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { z } from "@hono/zod-openapi";
-import { ListUsersQuerySchema, UploadAvatarSchema } from "./user.schemas";
+import { ListUsersQuerySchema } from "./user.schemas";
 import { ErrorResponseSchema, ForbiddenResponse } from "../../common/schemas";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../../auth";
 
@@ -20,7 +20,6 @@ export const listUsers = createRoute({
     "403": ForbiddenResponse,
   },
 });
-
 export const createUser = createRoute({
   method: "post",
   path: "/user/create",
@@ -32,7 +31,6 @@ export const createUser = createRoute({
           schema: z.object({
             username: z.string().min(2).max(64),
             password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
-            avatar: z.string().optional(),
             email: z.string(),
             status: z.coerce.number().optional(),
             roleIds: z.array(z.number()).optional(),
@@ -98,7 +96,6 @@ export const updateUser = createRoute({
           schema: z.object({
             id: z.number(),
             username: z.string().min(2).max(64).optional(),
-            avatar: z.string().optional(),
             email: z.string().optional(),
             status: z.coerce.number().optional(),
             roleIds: z.array(z.number()).optional(),
@@ -176,29 +173,6 @@ export const resetPassword = createRoute({
   },
   responses: {
     "200": { description: "重置成功" },
-    "401": {
-      description: "未授权",
-      content: { "application/json": { schema: ErrorResponseSchema } },
-    },
-    "403": ForbiddenResponse,
-  },
-});
-
-export const uploadAvatar = createRoute({
-  method: "post",
-  path: "/upload/avatar",
-  tags: ["user"],
-  request: {
-    body: {
-      content: { "multipart/form-data": { schema: UploadAvatarSchema } },
-    },
-  },
-  responses: {
-    "200": { description: "上传头像成功" },
-    "400": {
-      description: "文件格式或大小不符合要求",
-      content: { "application/json": { schema: ErrorResponseSchema } },
-    },
     "401": {
       description: "未授权",
       content: { "application/json": { schema: ErrorResponseSchema } },

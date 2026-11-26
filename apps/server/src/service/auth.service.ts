@@ -136,7 +136,6 @@ async function issueBetterAuthSession(
     id: number;
     username: string;
     password: string;
-    avatar: string | null;
   },
   password: string,
   request: Request,
@@ -156,7 +155,6 @@ async function issueBetterAuthSession(
         name: user.username,
         email,
         password,
-        image: user.avatar || undefined,
         legacyUserId: user.id,
       },
     });
@@ -173,7 +171,7 @@ async function issueBetterAuthSession(
       .set({
         name: user.username,
         email,
-        image: user.avatar,
+        image: null,
         updatedAt: now,
       } as Partial<typeof authUsers.$inferInsert>)
       .where(eq(authUsers.id, linkedUser.id));
@@ -232,7 +230,6 @@ export async function login(
       id: sysUsers.id,
       username: sysUsers.username,
       password: sysUsers.password,
-      avatar: sysUsers.avatar,
       email: sysUsers.email,
       status: sysUsers.status,
     })
@@ -432,7 +429,6 @@ export async function login(
   }
 
   return {
-    avatar: user.avatar || "",
     username: user.username,
     roles: roleCodes,
     permissions: roleCodes.includes("admin") ? ["*:*:*"] : buttonPermissions,

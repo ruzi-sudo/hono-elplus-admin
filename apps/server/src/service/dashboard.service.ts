@@ -7,7 +7,6 @@ export async function getMineInfo(userId: number) {
   const [user] = await db
     .select({
       id: sysUsers.id,
-      avatar: sysUsers.avatar,
       username: sysUsers.username,
       email: sysUsers.email,
       status: sysUsers.status,
@@ -31,7 +30,6 @@ export async function getMineInfo(userId: number) {
 
   return {
     id: user.id,
-    avatar: user.avatar || "",
     username: user.username,
     email: user.email || "",
     status: user.status ?? 1,

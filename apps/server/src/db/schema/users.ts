@@ -5,7 +5,6 @@ export const sysUsers = mysqlTable('sys_users', {
   id: int('id').primaryKey().autoincrement(),
   username: varchar('username', { length: 64 }).notNull().unique(),
   password: varchar('password', { length: 255 }).notNull(),
-  avatar: varchar('avatar', { length: 512 }),
   email: varchar('email', { length: 128 }),
   status: tinyint('status').default(1),
   remark: text('remark'),

@@ -15,6 +15,13 @@
       "when": 1795160473810,
       "tag": "0001_add_api_permission_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1795670400000,
+      "tag": "0002_remove_avatar",
+      "breakpoints": true
     }
   ]
 }

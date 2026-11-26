@@ -1,11 +1,9 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { z } from "@hono/zod-openapi";
 import { validatorParamsHook } from "../../common/validator";
 import * as routes from "./user.routes";
 import * as userService from "../../service/user.service";
 import * as roleService from "../../service/role.service";
 import * as authService from "../../service/auth.service";
-import { saveAvatar } from "../../service/upload.service";
 import { getAuthenticatedUser } from "../../middlewares/auth";
 import { assertButtonPermission } from "../../middlewares/rbac";
 
@@ -29,7 +27,6 @@ route.openapi(routes.createUser, async (c) => {
   const body = c.req.valid("json") as {
     username: string;
     password: string;
-    avatar?: string;
     email?: string;
     status?: number;
     roleIds?: number[];
@@ -55,7 +52,6 @@ route.openapi(routes.updateUser, async (c) => {
   const body = c.req.valid("json") as {
     id: number;
     username?: string;
-    avatar?: string;
     email?: string;
     status?: number;
     roleIds?: number[];
@@ -124,15 +120,4 @@ route.openapi(routes.listRoleIds, async (c) => {
   }
   const data = await roleService.getRoleIdsByUserId(body.userId);
   return c.json({ code: 0, message: "操作成功", data });
-});
-
-route.openapi(routes.uploadAvatar, async (c) => {
-  const { file } = c.req.valid("form");
-  const url = await saveAvatar(file);
-
-  return c.json({
-    code: 0,
-    message: "操作成功",
-    data: { url },
-  });
 });

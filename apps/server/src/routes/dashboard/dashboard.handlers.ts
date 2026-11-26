@@ -6,7 +6,6 @@ import * as routes from "./dashboard.routes";
 import * as dashboardService from "../../service/dashboard.service";
 import * as userService from "../../service/user.service";
 import * as authService from "../../service/auth.service";
-import { saveAvatar } from "../../service/upload.service";
 
 export const route = new OpenAPIHono({
   defaultHook: (result, c) => validatorParamsHook(result, c),
@@ -58,7 +57,6 @@ route.openapi(routes.updateMine, async (c) => {
     await userService.updateUser({
       id: user.userId,
       username: body.username,
-      avatar: body.avatar,
       email: body.email,
       remark: body.remark,
     });
@@ -95,10 +93,4 @@ route.openapi(routes.resetMinePassword, async (c) => {
       error.status || 400,
     );
   }
-});
-
-route.openapi(routes.uploadMineAvatar, async (c) => {
-  const { file } = c.req.valid("form");
-  const url = await saveAvatar(file);
-  return c.json({ code: 0, message: "操作成功", data: { url } });
 });
