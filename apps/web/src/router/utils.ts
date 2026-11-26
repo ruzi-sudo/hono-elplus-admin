@@ -22,6 +22,7 @@ import { userKey, type DataInfo } from "@/utils/auth";
 import { type menuType, routerArrays } from "@/layout/types";
 import { useMultiTagsStoreHook } from "@/store/modules/multiTags";
 import { usePermissionStoreHook } from "@/store/modules/permission";
+import { getAsyncRoutesCacheKey } from "./async-route-cache";
 // https://cn.vitejs.dev/guide/features.html#glob-import
 const modulesRoutes = import.meta.glob("/src/views/**/*.{vue,tsx}");
 
@@ -196,9 +197,11 @@ function handleAsyncRoutes(routeList) {
 /** 初始化路由（`new Promise` 写法防止在异步请求中造成无限循环）*/
 function initRouter() {
   if (getConfig()?.CachingAsyncRoutes) {
-    // 开启动态路由缓存本地localStorage
-    const key = "async-routes";
-    const asyncRouteList = storageLocal().getItem(key) as any;
+    // 动态路由缓存必须按登录用户隔离，避免不同账号复用菜单权限。
+    const username =
+      storageLocal().getItem<DataInfo<number>>(userKey)?.username;
+    const key = username ? getAsyncRoutesCacheKey(username) : "";
+    const asyncRouteList = key ? (storageLocal().getItem(key) as any) : null;
     if (asyncRouteList && asyncRouteList?.length > 0) {
       return new Promise((resolve) => {
         handleAsyncRoutes(asyncRouteList);
@@ -209,7 +212,7 @@ function initRouter() {
         getAsyncRoutes().then(({ code, data }) => {
           if (code === 0) {
             handleAsyncRoutes(cloneDeep(data));
-            storageLocal().setItem(key, data);
+            if (key) storageLocal().setItem(key, data);
             resolve(router);
           } else {
             resolve(router);
