@@ -153,6 +153,8 @@ mysql -h 127.0.0.1 -P 3308 -u root -p hono_elplus_admin \
 
 已有接口权限表的数据库，继续执行 `docker/migrations/20261124_add_api_permission_management.sql`，新增「系统管理 → 接口权限管理」入口和接口定义，不覆盖已有角色授权。新入口默认授予超级管理员。
 
+接口权限管理页的「新增接口」和「保存授权」按钮使用按钮级权限；已有数据库执行 `docker/migrations/20261126_add_api_permission_button_permissions.sql`，并默认授予超级管理员。
+
 在「角色管理」配置菜单、按钮和角色首页，在「接口权限管理」为角色配置具体的 HTTP 方法和路径。两处保存互不覆盖；页面或按钮可见不代表有权调用接口，缺少接口授权时服务端返回 HTTP 403。
 
 用户头像由用户名的第一个字符生成，系统不提供头像上传或修改接口，也不在用户信息接口中返回头像字段。已有数据库执行 `docker/migrations/20261126_remove_avatar.sql` 后，会删除用户表头像字段、头像内容和相关权限。

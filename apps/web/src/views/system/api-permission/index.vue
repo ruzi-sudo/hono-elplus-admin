@@ -235,8 +235,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnUnsavedChan
           <span class="context-icon"><PermissionIcon /></span>
           <div><h2 class="panel-title">接口权限管理</h2><p class="context-description">{{ role ? `${role.name} · ${role.code}` : '选择角色后配置接口访问权限' }}</p></div>
         </div>
-        <el-tag v-if="isBuiltInRole" type="info" effect="plain">内置角色 · 可编辑</el-tag>
-        <el-tag v-else-if="dirty" type="warning" effect="plain">有未保存的修改</el-tag>
+        <el-tag v-if="dirty" type="warning" effect="plain">有未保存的修改</el-tag>
       </div>
 
       <el-form class="permission-filters" :inline="true" @submit.prevent>
@@ -264,8 +263,12 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnUnsavedChan
       <div class="permission-table-panel">
         <PureTableBar title="接口列表" :columns="columns" @refresh="refresh">
           <template #buttons>
-            <el-button v-if="canEditCatalog" :icon="useRenderIcon(AddIcon)" @click="editCatalog()">新增接口</el-button>
-            <el-button type="primary" :icon="useRenderIcon(SaveIcon)" :loading="saving" :disabled="!canEditGrants || !dirty" @click="saveGrants">保存授权</el-button>
+            <Auth value="system-api-permission:add">
+              <el-button v-if="canEditCatalog" :icon="useRenderIcon(AddIcon)" @click="editCatalog()">新增接口</el-button>
+            </Auth>
+            <Auth value="system-api-permission:save">
+              <el-button type="primary" :icon="useRenderIcon(SaveIcon)" :loading="saving" :disabled="!canEditGrants || !dirty" @click="saveGrants">保存授权</el-button>
+            </Auth>
           </template>
           <template #default="{ size, dynamicColumns }">
             <div class="grant-summary">

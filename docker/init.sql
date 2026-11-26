@@ -399,7 +399,9 @@ INSERT IGNORE INTO sys_pages (id, parent_id, menu_type, title, `rank`, auths, st
 (118, 13, 1, '清空日志', 1, 'system-log:clear', 1),
 (119, 13, 1, '批量删除', 2, 'system-log:batch-delete', 1),
 (120, 13, 1, '详情', 3, 'system-log:view', 1),
-(121, 10, 1, '强退', 1, 'online-user:force-logout', 1);
+(121, 10, 1, '强退', 1, 'online-user:force-logout', 1),
+(123, 14, 1, '新增接口', 1, 'system-api-permission:add', 1),
+(124, 14, 1, '保存授权', 2, 'system-api-permission:save', 1);
 
 INSERT IGNORE INTO sys_role_pages (role_id, page_id)
 SELECT 1, id FROM sys_pages;
