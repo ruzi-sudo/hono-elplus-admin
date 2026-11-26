@@ -1,336 +1,385 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, shallowRef } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
+import { ElMessageBox } from "element-plus";
+import { PureTableBar } from "@/components/RePureTableBar";
+import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { useUserStoreHook } from "@/store/modules/user";
 import { message } from "@/utils/message";
 import {
-  createApiPermission,
-  getRoleApiPermissionIds,
   listApiPermissionRoles,
   listApiPermissions,
-  saveRoleApiPermissions,
-  updateApiPermission,
   type ApiPermission,
   type ApiPermissionRole,
 } from "@/api/system";
+import ApiCatalogDialog from "./components/ApiCatalogDialog.vue";
+import { useRoleApiGrants } from "./useRoleApiGrants";
+import SearchIcon from "~icons/ri/search-line";
+import RoleIcon from "~icons/ri/shield-user-line";
+import PermissionIcon from "~icons/ri/shield-keyhole-line";
+import RefreshIcon from "~icons/ri/refresh-line";
+import AddIcon from "~icons/ri/add-circle-line";
+import SaveIcon from "~icons/ri/save-line";
+import EditIcon from "~icons/ri/edit-line";
 
 defineOptions({ name: "SystemApiPermission" });
 
-const user = useUserStoreHook();
-const canEditCatalog = computed(() => user.roles.includes("admin"));
+const canEditCatalog = computed(() => useUserStoreHook().roles.includes("admin"));
 const roles = shallowRef<ApiPermissionRole[]>([]);
 const catalog = shallowRef<ApiPermission[]>([]);
-const selectedRole = shallowRef<ApiPermissionRole>();
-const loadedRoleId = shallowRef<number>();
-const selectedIds = shallowRef(new Set<number>());
-const roleSearch = shallowRef("");
-const catalogSearch = shallowRef("");
 const rolesLoading = shallowRef(true);
 const catalogLoading = shallowRef(true);
-const grantLoading = shallowRef(false);
-const saving = shallowRef(false);
 const roleError = shallowRef("");
 const catalogError = shallowRef("");
-const grantError = shallowRef("");
-const saveError = shallowRef("");
-let requestVersion = 0;
-let pendingSave: Promise<unknown> | undefined;
-
-const readOnly = computed(() =>
-  ["admin", "common"].includes(selectedRole.value?.code ?? ""),
-);
-const grantsReady = computed(() =>
-  selectedRole.value !== undefined && loadedRoleId.value === selectedRole.value.id,
-);
-const canEditGrants = computed(() =>
-  grantsReady.value && !readOnly.value && !catalogLoading.value &&
-  !catalogError.value && !saving.value,
-);
+const roleSearch = shallowRef("");
+const keyword = shallowRef("");
+const moduleFilter = shallowRef("");
+const methodFilter = shallowRef("");
+const grantFilter = shallowRef("");
+const page = shallowRef(1);
+const pageSize = shallowRef(10);
+const catalogDialog = shallowRef(false);
+const editingPermission = shallowRef<ApiPermission | null>(null);
+const {
+  role, selectedIds, loading: grantLoading, saving, loadError, saveError,
+  ready, changes, dirty, load, update, discard, save,
+} = useRoleApiGrants();
+const canEditGrants = computed(() => ready.value && !saving.value &&
+  !catalogLoading.value && !catalogError.value);
+const isAdminRole = computed(() => role.value?.code === "admin");
+const isBuiltInRole = computed(() => ["admin", "common"].includes(role.value?.code ?? ""));
+const isGranted = (id: number) => ready.value && selectedIds.value.has(id);
+const grantedCount = computed(() => ready.value
+  ? catalog.value.filter(permission => isGranted(permission.id)).length : 0);
 const filteredRoles = computed(() => {
   const query = roleSearch.value.trim().toLowerCase();
-  return roles.value.filter((role) =>
-    `${role.name} ${role.code}`.toLowerCase().includes(query),
-  );
+  return roles.value.filter(item => `${item.name} ${item.code}`.toLowerCase().includes(query));
 });
-const groupedCatalog = computed(() => {
-  const query = catalogSearch.value.trim().toLowerCase();
-  const groups = new Map<string, ApiPermission[]>();
-  for (const permission of catalog.value) {
-    const { name, code, module, method, path } = permission;
-    if (query && !`${name} ${code} ${module} ${method} ${path}`.toLowerCase().includes(query)) continue;
-    const items = groups.get(module);
-    if (items) items.push(permission);
-    else groups.set(module, [permission]);
-  }
-  return [...groups.entries()];
+const modules = computed(() => [...new Set(catalog.value.map(item => item.module))]);
+const methods = computed(() => [...new Set(catalog.value.map(item => item.method))]);
+const filteredCatalog = computed(() => {
+  const query = keyword.value.trim().toLowerCase();
+  return catalog.value.filter(item => {
+    if (query && !`${item.name} ${item.path} ${item.code}`.toLowerCase().includes(query)) return false;
+    if (moduleFilter.value && item.module !== moduleFilter.value) return false;
+    if (methodFilter.value && item.method !== methodFilter.value) return false;
+    if (grantFilter.value && (!ready.value || isGranted(item.id) !== (grantFilter.value === "granted"))) return false;
+    return true;
+  });
 });
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredCatalog.value.length / pageSize.value)));
+const currentPage = computed({
+  get: () => Math.min(page.value, pageCount.value),
+  set: value => { page.value = value; },
+});
+const pageRows = computed(() => filteredCatalog.value.slice(
+  (currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value,
+));
+const editableFilteredIds = computed(() => filteredCatalog.value.filter(item => item.assignable).map(item => item.id));
+const selectedFilteredCount = computed(() => editableFilteredIds.value.filter(id => selectedIds.value.has(id)).length);
+const allFilteredSelected = computed(() => editableFilteredIds.value.length > 0 &&
+  selectedFilteredCount.value === editableFilteredIds.value.length);
+const partialFilteredSelected = computed(() => selectedFilteredCount.value > 0 && !allFilteredSelected.value);
+const columns: TableColumnList = [
+  { label: "授权", slot: "grant", width: 70, align: "center" },
+  { label: "接口名称", prop: "name", minWidth: 150 },
+  { label: "请求方法", slot: "method", width: 100 },
+  { label: "接口路径 / 权限编码", slot: "endpoint", minWidth: 260 },
+  { label: "所属模块", prop: "module", minWidth: 110 },
+  { label: "状态", slot: "status", width: 90 },
+  ...(canEditCatalog.value ? [{ label: "操作", slot: "operation", width: 90, fixed: "right" as const }] : []),
+];
+const headerCellStyle = { background: "var(--el-fill-color-light)", color: "var(--el-text-color-primary)" };
 
 function errorMessage(cause: unknown, fallback: string) {
-  if (cause && typeof cause === "object" && "message" in cause &&
-    typeof cause.message === "string" && cause.message) return cause.message;
-  return fallback;
+  return cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string"
+    ? cause.message : fallback;
 }
 
-function togglePermission(permission: ApiPermission, checked: boolean) {
-  if (!canEditGrants.value || !permission.assignable) return;
-  const next = new Set(selectedIds.value);
-  if (checked) next.add(permission.id);
-  else next.delete(permission.id);
-  selectedIds.value = next;
-}
-
-async function loadRolePermissions(role: ApiPermissionRole) {
-  const version = ++requestVersion;
-  selectedRole.value = role;
-  loadedRoleId.value = undefined;
-  selectedIds.value = new Set();
-  grantError.value = "";
-  saveError.value = "";
-  grantLoading.value = true;
+async function confirmDiscard() {
+  if (saving.value) return false;
+  if (!dirty.value) return true;
   try {
-    // A quick switch back must not fetch from before an in-flight save.
-    if (pendingSave) await pendingSave.catch(() => undefined);
-    if (version !== requestVersion) return;
-    const result = await getRoleApiPermissionIds({ id: role.id });
-    if (version !== requestVersion) return;
-    if (result.code !== 0 || !Array.isArray(result.data?.apiPermissionIds)) {
-      throw new Error(result.message || "接口权限加载失败");
-    }
-    selectedIds.value = new Set(result.data.apiPermissionIds);
-    loadedRoleId.value = role.id;
-  } catch (cause) {
-    if (version === requestVersion) {
-      grantError.value = errorMessage(cause, "接口权限加载失败");
-    }
-  } finally {
-    if (version === requestVersion) grantLoading.value = false;
-  }
-}
-
-async function save() {
-  const role = selectedRole.value;
-  if (!role || !canEditGrants.value) return;
-  const version = requestVersion;
-  saveError.value = "";
-  saving.value = true;
-  try {
-    const request = saveRoleApiPermissions({
-      id: role.id,
-      apiPermissionIds: [...selectedIds.value],
+    await ElMessageBox.confirm("当前角色的接口授权尚未保存，是否放弃修改？", "未保存的修改", {
+      type: "warning", confirmButtonText: "放弃修改", cancelButtonText: "继续编辑",
     });
-    pendingSave = request;
-    const result = await request;
-    if (result.code !== 0) throw new Error(result.message || "接口权限保存失败");
-    message(`角色 ${role.name} 的接口权限保存成功`, { type: "success" });
-  } catch (cause) {
-    const detail = errorMessage(cause, "接口权限保存失败");
-    if (version === requestVersion) saveError.value = detail;
-    else message(`角色 ${role.name}：${detail}`, { type: "error" });
-  } finally {
-    pendingSave = undefined;
-    saving.value = false;
+    discard();
+    return true;
+  } catch {
+    return false;
   }
 }
+
+async function selectRole(nextRole: ApiPermissionRole) {
+  if (nextRole.id === role.value?.id || !(await confirmDiscard())) return;
+  grantFilter.value = "";
+  page.value = 1;
+  await load(nextRole);
+}
+
+async function saveGrants() {
+  if (!canEditGrants.value) return;
+  if (await save()) message("接口授权已保存", { type: "success" });
+}
+
+let rolesRequestVersion = 0;
+let catalogRequestVersion = 0;
 
 async function loadRoles() {
+  const version = ++rolesRequestVersion;
   rolesLoading.value = true;
   roleError.value = "";
   try {
     const result = await listApiPermissionRoles();
-    if (result.code !== 0 || !Array.isArray(result.data)) {
-      throw new Error(result.message || "角色列表加载失败");
-    }
+    if (version !== rolesRequestVersion) return;
+    if (result.code !== 0 || !Array.isArray(result.data)) throw new Error(result.message || "角色列表加载失败");
     roles.value = result.data;
+    if (!role.value && result.data.length) await load(result.data[0]);
   } catch (cause) {
-    roleError.value = errorMessage(cause, "角色列表加载失败");
+    if (version === rolesRequestVersion) roleError.value = errorMessage(cause, "角色列表加载失败");
   } finally {
-    rolesLoading.value = false;
+    if (version === rolesRequestVersion) rolesLoading.value = false;
   }
 }
 
 async function loadCatalog() {
+  const version = ++catalogRequestVersion;
   catalogLoading.value = true;
   catalogError.value = "";
   try {
     const result = await listApiPermissions();
-    if (result.code !== 0 || !Array.isArray(result.data)) {
-      throw new Error(result.message || "接口目录加载失败");
-    }
+    if (version !== catalogRequestVersion) return;
+    if (result.code !== 0 || !Array.isArray(result.data)) throw new Error(result.message || "接口目录加载失败");
     catalog.value = result.data;
   } catch (cause) {
-    catalogError.value = errorMessage(cause, "接口目录加载失败");
+    if (version === catalogRequestVersion) catalogError.value = errorMessage(cause, "接口目录加载失败");
   } finally {
-    catalogLoading.value = false;
+    if (version === catalogRequestVersion) catalogLoading.value = false;
   }
 }
 
-const catalogDialog = shallowRef(false);
-const catalogSaving = shallowRef(false);
-const catalogFormError = shallowRef("");
-const catalogForm = reactive({
-  id: 0, code: "", name: "", module: "", method: "GET", path: "",
-  description: "", sort: 0, status: 1,
-});
+async function refresh() {
+  if (!(await confirmDiscard())) return;
+  await Promise.all([loadCatalog(), role.value ? load(role.value) : loadRoles()]);
+}
 
-function editCatalog(permission?: ApiPermission) {
-  if (!canEditCatalog.value || catalogSaving.value) return;
-  Object.assign(catalogForm, {
-    id: permission?.id ?? 0,
-    code: permission?.code ?? "",
-    name: permission?.name ?? "",
-    module: permission?.module ?? "",
-    method: permission?.method ?? "GET",
-    path: permission?.path ?? "",
-    description: permission?.description ?? "",
-    sort: permission?.sort ?? 0,
-    status: permission?.status ?? 1,
-  });
-  catalogFormError.value = "";
+function resetFilters() {
+  keyword.value = "";
+  moduleFilter.value = "";
+  methodFilter.value = "";
+  grantFilter.value = "";
+  page.value = 1;
+}
+
+function editCatalog(permission: ApiPermission | null = null) {
+  editingPermission.value = permission;
   catalogDialog.value = true;
 }
 
-async function saveCatalog() {
-  if (!canEditCatalog.value || catalogSaving.value) return;
-  const { id, code, name, module, method, path, description, sort, status } = catalogForm;
-  const payload = {
-    code: code.trim(), name: name.trim(), module: module.trim(),
-    method: method.trim().toUpperCase(), path: path.trim(), description, sort, status,
-  };
-  if (!payload.code || !payload.name || !payload.module || !payload.method || !payload.path) {
-    catalogFormError.value = "请填写编码、名称、模块、方法和路径";
-    return;
-  }
-  catalogSaving.value = true;
-  catalogFormError.value = "";
-  try {
-    const result = id
-      ? await updateApiPermission({ id, ...payload })
-      : await createApiPermission(payload);
-    if (result.code !== 0) throw new Error(result.message || "接口目录保存失败");
-    catalogDialog.value = false;
-    message("接口目录保存成功", { type: "success" });
-    await loadCatalog();
-  } catch (cause) {
-    catalogFormError.value = errorMessage(cause, "接口目录保存失败");
-  } finally {
-    catalogSaving.value = false;
-  }
+function methodType(method: string) {
+  if (method === "GET") return "success";
+  if (method === "DELETE") return "danger";
+  if (method === "PUT" || method === "PATCH") return "warning";
+  return "primary";
 }
 
+function warnUnsavedChanges(event: BeforeUnloadEvent) {
+  if (!dirty.value) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+onBeforeRouteLeave(confirmDiscard);
 onMounted(() => {
+  window.addEventListener("beforeunload", warnUnsavedChanges);
   void loadRoles();
   void loadCatalog();
 });
+onBeforeUnmount(() => window.removeEventListener("beforeunload", warnUnsavedChanges));
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 lg:flex-row">
-    <el-card class="w-full shrink-0 lg:w-64" shadow="never">
-      <template #header><span class="font-bold">角色</span></template>
-      <el-input v-model="roleSearch" clearable placeholder="搜索角色名称或标识" aria-label="搜索角色" class="mb-3" />
-      <el-skeleton v-if="rolesLoading" :rows="3" animated />
-      <template v-else-if="roleError">
+  <div class="main permission-page">
+    <aside class="role-panel">
+      <div class="role-panel__heading">
+        <span class="panel-title">角色列表</span>
+        <el-tag size="small" type="info" round>{{ roles.length }}</el-tag>
+      </div>
+      <div class="role-panel__search">
+        <el-input v-model="roleSearch" clearable placeholder="搜索角色名称或标识" aria-label="搜索角色" :prefix-icon="useRenderIcon(SearchIcon)" />
+      </div>
+      <div v-if="rolesLoading" class="role-panel__state"><el-skeleton :rows="4" animated /></div>
+      <div v-else-if="roleError" class="role-panel__state">
         <el-alert :title="roleError" type="error" show-icon :closable="false" />
-        <el-button text type="primary" @click="loadRoles">重试</el-button>
-      </template>
-      <el-empty v-else-if="!filteredRoles.length" :description="roleSearch ? '没有匹配的角色' : '暂无角色'" :image-size="72" />
-      <el-scrollbar v-else max-height="calc(100vh - 240px)">
+        <el-button class="retry-button" @click="loadRoles">重新加载</el-button>
+      </div>
+      <el-empty v-else-if="!filteredRoles.length" :image-size="64" description="暂无匹配角色" />
+      <el-scrollbar v-else max-height="560px" class="role-panel__list">
         <button
-          v-for="role in filteredRoles"
-          :key="role.id"
-          type="button"
-          class="mb-1 block w-full rounded-sm px-3 py-2 text-left hover:bg-(--el-fill-color-light) aria-pressed:bg-(--el-color-primary-light-9) aria-pressed:text-(--el-color-primary)"
-          :aria-pressed="role.id === selectedRole?.id"
-          @click="role.id !== selectedRole?.id && loadRolePermissions(role)"
+          v-for="item in filteredRoles" :key="item.id" type="button" class="role-option"
+          :class="{ 'is-active': item.id === role?.id }" :aria-pressed="item.id === role?.id"
+          :aria-label="`${item.name} (${item.code})`" :disabled="saving" @click="selectRole(item)"
         >
-          {{ role.name }} ({{ role.code }})
-          <el-tag v-if="role.code === 'admin' || role.code === 'common'" size="small" type="info">只读</el-tag>
-          <el-tag v-else-if="role.status !== 1" size="small" type="info">已停用</el-tag>
+          <span class="role-option__icon"><RoleIcon /></span>
+          <span class="role-option__body"><span class="role-option__name">{{ item.name }}</span><span class="role-option__code">{{ item.code }}</span></span>
+          <el-tag v-if="['admin', 'common'].includes(item.code)" size="small" type="info" effect="plain">内置 · 可编辑</el-tag>
+          <el-tag v-else-if="item.status !== 1" size="small" type="info" effect="plain">停用</el-tag>
         </button>
       </el-scrollbar>
-    </el-card>
+      <div class="role-panel__hint">选择角色，配置可访问的接口。<br>页面与按钮权限在角色管理中配置。</div>
+    </aside>
 
-    <el-card class="min-w-0 flex-1" shadow="never">
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <span class="font-bold">接口权限</span>
-            <span v-if="selectedRole" class="ml-2 text-text_color_secondary">{{ selectedRole.name }}</span>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <el-button v-if="canEditCatalog" :disabled="catalogLoading || catalogSaving" @click="editCatalog()">新增接口</el-button>
-            <el-button type="primary" :loading="saving" :disabled="!canEditGrants" @click="save">保存接口权限</el-button>
-          </div>
+    <section class="permission-content">
+      <div class="permission-context">
+        <div class="permission-context__heading">
+          <span class="context-icon"><PermissionIcon /></span>
+          <div><h2 class="panel-title">接口权限管理</h2><p class="context-description">{{ role ? `${role.name} · ${role.code}` : '选择角色后配置接口访问权限' }}</p></div>
         </div>
-      </template>
-      <el-alert v-if="!selectedRole" title="请选择角色以查看接口授权" type="info" show-icon :closable="false" class="mb-3" />
-      <el-alert v-else-if="readOnly" title="内置角色的接口权限为只读" type="info" show-icon :closable="false" class="mb-3" />
-      <el-alert v-if="saveError" :title="saveError" type="error" show-icon :closable="false" class="mb-3" />
-      <template v-if="grantError && selectedRole">
-        <el-alert :title="grantError" type="error" show-icon :closable="false" />
-        <el-button text type="primary" @click="loadRolePermissions(selectedRole)">重试读取授权</el-button>
-      </template>
-      <el-input
-        v-model="catalogSearch" clearable class="mb-3" aria-label="搜索接口"
-        placeholder="搜索名称、模块、方法、路径或权限编码"
-      />
-      <el-skeleton v-if="catalogLoading || grantLoading" :rows="8" animated />
-      <template v-else-if="catalogError">
-        <el-alert :title="catalogError" type="error" show-icon :closable="false" />
-        <el-button text type="primary" @click="loadCatalog">重试读取接口目录</el-button>
-      </template>
-      <el-empty v-else-if="!groupedCatalog.length" :description="catalogSearch ? '没有匹配的接口' : '暂无接口权限'" />
-      <el-scrollbar v-else max-height="calc(100vh - 280px)">
-        <section v-for="[module, permissions] in groupedCatalog" :key="module" class="mb-4">
-          <h3 class="mb-1 font-bold">{{ module || "未分组" }}</h3>
-          <div
-            v-for="permission in permissions" :key="permission.id"
-            class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-(--el-border-color-lighter) py-2"
-          >
-            <el-checkbox
-              v-if="grantsReady"
-              :model-value="selectedIds.has(permission.id)"
-              :disabled="!canEditGrants || !permission.assignable"
-              :aria-label="permission.name"
-              @change="togglePermission(permission, $event === true)"
-            />
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span>{{ permission.name }}</span>
-                <el-tag size="small">{{ permission.method }}</el-tag>
-                <el-tag v-if="!permission.assignable" size="small" type="info">不可分配</el-tag>
-                <el-tag v-if="permission.status === 0" size="small" type="info">已停用</el-tag>
-              </div>
-              <div class="mt-1 wrap-anywhere text-xs text-text_color_secondary">
-                {{ permission.path }} · {{ permission.code }}
-              </div>
-            </div>
-            <el-button v-if="canEditCatalog" link type="primary" @click="editCatalog(permission)">编辑接口</el-button>
-          </div>
-        </section>
-      </el-scrollbar>
-    </el-card>
+        <el-tag v-if="isBuiltInRole" type="info" effect="plain">内置角色 · 可编辑</el-tag>
+        <el-tag v-else-if="dirty" type="warning" effect="plain">有未保存的修改</el-tag>
+      </div>
 
-    <el-dialog
-      v-if="canEditCatalog" v-model="catalogDialog"
-      :title="catalogForm.id ? '编辑接口' : '新增接口'"
-      width="min(520px, 95vw)" :close-on-click-modal="!catalogSaving"
-      :close-on-press-escape="!catalogSaving" :show-close="!catalogSaving"
-    >
-      <el-alert v-if="catalogFormError" :title="catalogFormError" type="error" show-icon :closable="false" class="mb-3" />
-      <el-form label-position="top" :disabled="catalogSaving" @submit.prevent="saveCatalog">
-        <el-form-item label="权限编码" required><el-input v-model="catalogForm.code" maxlength="128" /></el-form-item>
-        <el-form-item label="名称" required><el-input v-model="catalogForm.name" maxlength="128" /></el-form-item>
-        <el-form-item label="模块" required><el-input v-model="catalogForm.module" maxlength="64" /></el-form-item>
-        <el-form-item label="方法" required><el-input v-model="catalogForm.method" maxlength="16" /></el-form-item>
-        <el-form-item label="路径" required><el-input v-model="catalogForm.path" maxlength="255" /></el-form-item>
-        <el-form-item label="描述"><el-input v-model="catalogForm.description" type="textarea" maxlength="255" /></el-form-item>
-        <el-form-item label="排序"><el-input-number v-model="catalogForm.sort" :precision="0" /></el-form-item>
-        <el-form-item label="状态"><el-switch v-model="catalogForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
+      <el-form class="permission-filters" :inline="true" @submit.prevent>
+        <el-form-item label="接口搜索">
+          <el-input v-model="keyword" class="keyword-input" clearable placeholder="名称 / 路径 / 权限编码" aria-label="搜索接口" :prefix-icon="useRenderIcon(SearchIcon)" @input="page = 1" />
+        </el-form-item>
+        <el-form-item label="所属模块">
+          <el-select v-model="moduleFilter" class="module-select" clearable placeholder="全部模块" aria-label="所属模块" @change="page = 1">
+            <el-option v-for="item in modules" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="请求方法">
+          <el-select v-model="methodFilter" class="method-select" clearable placeholder="全部方法" aria-label="请求方法筛选" @change="page = 1">
+            <el-option v-for="item in methods" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="授权状态">
+          <el-select v-model="grantFilter" class="grant-select" clearable :disabled="!ready" placeholder="全部" aria-label="授权状态筛选" @change="page = 1">
+            <el-option label="已授权" value="granted" /><el-option label="未授权" value="ungranted" />
+          </el-select>
+        </el-form-item>
+        <el-form-item><el-button :icon="useRenderIcon(RefreshIcon)" @click="resetFilters">重置</el-button></el-form-item>
       </el-form>
-      <template #footer>
-        <el-button :disabled="catalogSaving" @click="catalogDialog = false">取消</el-button>
-        <el-button type="primary" :loading="catalogSaving" @click="saveCatalog">保存接口定义</el-button>
-      </template>
-    </el-dialog>
+
+      <div class="permission-table-panel">
+        <PureTableBar title="接口列表" :columns="columns" @refresh="refresh">
+          <template #buttons>
+            <el-button v-if="canEditCatalog" :icon="useRenderIcon(AddIcon)" @click="editCatalog()">新增接口</el-button>
+            <el-button type="primary" :icon="useRenderIcon(SaveIcon)" :loading="saving" :disabled="!canEditGrants || !dirty" @click="saveGrants">保存授权</el-button>
+          </template>
+          <template #default="{ size, dynamicColumns }">
+            <div class="grant-summary">
+              <span v-if="!role">请选择左侧角色后配置接口授权</span>
+              <span v-else-if="isAdminRole">超级管理员接口授权可编辑，勾选后保存生效。</span>
+              <span v-else-if="isBuiltInRole">内置角色接口授权可编辑，勾选后保存生效。</span>
+              <span v-else-if="role.status !== 1">该角色已停用，保存的授权将在角色启用后生效。</span>
+              <span v-else>勾选角色可访问的接口，保存后生效。禁用的接口不会放行请求。</span>
+              <span v-if="ready" class="grant-summary__count">已授权 <strong>{{ grantedCount }}</strong> / {{ catalog.length }}</span>
+            </div>
+            <div v-if="catalogError || loadError || saveError" class="permission-error">
+              <el-alert :title="catalogError || loadError || saveError" type="error" show-icon :closable="false" />
+              <el-button v-if="catalogError || loadError" @click="refresh">重试</el-button>
+            </div>
+            <div class="grant-batch">
+              <el-checkbox :model-value="allFilteredSelected" :indeterminate="partialFilteredSelected" :disabled="!canEditGrants || !editableFilteredIds.length" @change="update(editableFilteredIds, $event === true)">全选当前筛选结果</el-checkbox>
+              <span class="muted">共 {{ filteredCatalog.length }} 个接口</span>
+              <el-button v-if="dirty" link type="primary" :disabled="saving" @click="discard">撤销本次修改</el-button>
+            </div>
+            <pure-table
+              row-key="id" :data="pageRows" :columns="dynamicColumns" :size="size" show-overflow-tooltip
+              :loading="catalogLoading || grantLoading" :header-cell-style="headerCellStyle"
+              :pagination="{ total: filteredCatalog.length, pageSize, currentPage, pageSizes: [10, 20, 50], background: true }"
+              @page-size-change="pageSize = $event; page = 1" @page-current-change="currentPage = $event"
+            >
+              <template #grant="{ row }">
+                <el-tooltip v-if="ready" :disabled="row.assignable" content="不能分配自身未拥有的接口权限" placement="top">
+                  <span><el-checkbox :aria-label="`授权 ${row.name}`" :model-value="isGranted(row.id)" :disabled="!canEditGrants || !row.assignable" @change="update([row.id], $event === true)" /></span>
+                </el-tooltip>
+                <span v-else class="muted">—</span>
+              </template>
+              <template #method="{ row }"><el-tag :type="methodType(row.method)" effect="light" size="small" class="method-tag">{{ row.method }}</el-tag></template>
+              <template #endpoint="{ row }"><div class="endpoint-path">{{ row.path }}</div><div class="endpoint-code">{{ row.code }}</div></template>
+              <template #status="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'" effect="plain" size="small">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template>
+              <template #operation="{ row }"><el-button link type="primary" :size="size" :icon="useRenderIcon(EditIcon)" @click="editCatalog(row)">修改</el-button></template>
+              <template #empty><el-empty :image-size="64" :description="catalogError ? '接口目录加载失败' : '暂无匹配接口'" /></template>
+            </pure-table>
+            <div v-if="dirty" class="changes-note" role="status">待保存：新增 {{ changes.added }} 项授权，取消 {{ changes.removed }} 项授权。筛选和翻页不会丢失勾选。</div>
+          </template>
+        </PureTableBar>
+      </div>
+    </section>
+    <ApiCatalogDialog v-if="canEditCatalog" v-model="catalogDialog" :permission="editingPermission" @saved="loadCatalog" />
   </div>
 </template>
+
+<style lang="scss" scoped>
+.permission-page {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  color: var(--el-text-color-primary);
+}
+.role-panel, .permission-context, .permission-filters, .permission-table-panel {
+  background: var(--el-bg-color);
+  border-radius: var(--el-border-radius-base);
+}
+.role-panel { overflow: hidden; }
+.role-panel__heading { display: flex; align-items: center; justify-content: space-between; padding: 20px; border-bottom: 1px solid var(--el-border-color-lighter); }
+.panel-title { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; }
+.role-panel__search { padding: 16px 16px 8px; }
+.role-panel__list { padding: 4px 8px 12px; }
+.role-panel__state { padding: 20px 16px; }
+.role-option {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 4px 0; padding: 12px 10px;
+  font: inherit; color: var(--el-text-color-regular); text-align: left; background: transparent;
+  border: 1px solid transparent; border-radius: var(--el-border-radius-base); cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.role-option:hover { background: var(--el-fill-color-light); }
+.role-option.is-active { color: var(--el-color-primary); background: var(--el-color-primary-light-9); border-color: var(--el-color-primary-light-7); }
+.role-option:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: -2px; }
+.role-option:disabled { cursor: not-allowed; }
+.role-option__icon { display: flex; flex: 0 0 32px; align-items: center; justify-content: center; height: 32px; font-size: 20px; }
+.role-option__body { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.role-option__name { overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.role-option__code { overflow: hidden; color: var(--el-text-color-secondary); font-size: 12px; text-overflow: ellipsis; }
+.role-panel__hint { padding: 16px; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.8; border-top: 1px solid var(--el-border-color-lighter); }
+.permission-content { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.permission-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; }
+.permission-context__heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.context-icon { display: flex; flex: 0 0 40px; align-items: center; justify-content: center; height: 40px; color: var(--el-color-primary); font-size: 22px; background: var(--el-color-primary-light-9); border-radius: var(--el-border-radius-base); }
+.context-description { margin: 4px 0 0; color: var(--el-text-color-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.permission-filters { padding: 18px 24px 0; }
+.permission-filters :deep(.el-form-item) { margin-right: 20px; margin-bottom: 18px; }
+.keyword-input { width: 236px; }
+.module-select { width: 150px; }
+.method-select { width: 130px; }
+.grant-select { width: 120px; }
+.permission-table-panel { overflow: hidden; }
+.permission-table-panel :deep(.el-table__inner-wrapper::before) { height: 0; }
+.grant-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 16px 12px; padding: 12px 16px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.6; background: var(--el-fill-color-lighter); border-radius: var(--el-border-radius-base); }
+.grant-summary__count { flex-shrink: 0; }
+.grant-summary__count strong { color: var(--el-color-primary); font-size: 16px; }
+.grant-batch { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 0 20px 12px; }
+.grant-batch :deep(.el-checkbox__label) { font-weight: 400; }
+.muted { color: var(--el-text-color-secondary); font-size: 13px; }
+.method-tag { min-width: 58px; text-align: center; font-family: var(--el-font-family); }
+.endpoint-path { color: var(--el-text-color-primary); font-family: monospace; font-size: 13px; line-height: 22px; }
+.endpoint-code { color: var(--el-text-color-secondary); font-size: 12px; line-height: 20px; }
+.permission-error { display: flex; align-items: center; gap: 12px; padding: 0 16px 12px; }
+.retry-button { margin-top: 12px; }
+.changes-note { padding: 12px 20px; color: var(--el-color-warning); font-size: 13px; border-top: 1px solid var(--el-border-color-lighter); }
+@media (max-width: 1100px) {
+  .permission-page { grid-template-columns: 210px minmax(0, 1fr); }
+  .permission-filters { padding-right: 16px; padding-left: 16px; }
+}
+@media (max-width: 760px) {
+  .permission-page { grid-template-columns: minmax(0, 1fr); }
+  .role-panel__list { max-height: 220px; }
+  .permission-context { padding: 16px; }
+  .permission-filters :deep(.el-form-item) { display: flex; margin-right: 0; }
+  .permission-filters :deep(.el-form-item__content) { min-width: 0; }
+  .keyword-input, .module-select, .method-select, .grant-select { width: 100%; }
+}
+</style>

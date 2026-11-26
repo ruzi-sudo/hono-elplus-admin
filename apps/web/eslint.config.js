@@ -14,7 +14,7 @@ export default defineConfig([
     "*.d.ts",
     "public/*",
     "src/assets/**",
-    "src/**/iconfont/**"
+    "src/**/iconfont/**",
   ]),
   {
     ...js.configs.recommended,
@@ -48,11 +48,11 @@ export default defineConfig([
         PromiseFn: "readonly",
         ComponentElRef: "readonly",
         parseInt: "readonly",
-        parseFloat: "readonly"
-      }
+        parseFloat: "readonly",
+      },
     },
     plugins: {
-      prettier: pluginPrettier
+      prettier: pluginPrettier,
     },
     rules: {
       ...configPrettier.rules,
@@ -62,20 +62,20 @@ export default defineConfig([
         "error",
         {
           argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_"
-        }
+          varsIgnorePattern: "^_",
+        },
       ],
       "prettier/prettier": [
         "error",
         {
-          endOfLine: "auto"
-        }
-      ]
-    }
+          endOfLine: "auto",
+        },
+      ],
+    },
   },
-  ...tseslint.configs.recommended.map(config => ({
+  ...tseslint.configs.recommended.map((config) => ({
     ...config,
-    files: ["**/*.?([cm])ts", "**/*.?([cm])tsx"]
+    files: ["**/*.?([cm])ts", "**/*.?([cm])tsx"],
   })),
   {
     files: ["**/*.?([cm])ts", "**/*.?([cm])tsx"],
@@ -92,32 +92,32 @@ export default defineConfig([
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/consistent-type-imports": [
         "error",
-        { disallowTypeAnnotations: false, fixStyle: "inline-type-imports" }
+        { disallowTypeAnnotations: false, fixStyle: "inline-type-imports" },
       ],
       "@typescript-eslint/prefer-literal-enum-member": [
         "error",
-        { allowBitwiseExpressions: true }
+        { allowBitwiseExpressions: true },
       ],
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
           argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_"
-        }
-      ]
-    }
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
   },
   {
     files: ["**/*.d.ts"],
     rules: {
-      "no-restricted-syntax": "off"
-    }
+      "no-restricted-syntax": "off",
+    },
   },
   {
     files: ["**/*.?([cm])js"],
     rules: {
-      "@typescript-eslint/no-require-imports": "off"
-    }
+      "@typescript-eslint/no-require-imports": "off",
+    },
   },
   {
     files: ["**/*.vue"],
@@ -129,21 +129,21 @@ export default defineConfig([
         $customRef: "readonly",
         $ref: "readonly",
         $shallowRef: "readonly",
-        $toRef: "readonly"
+        $toRef: "readonly",
       },
       parser: parserVue,
       parserOptions: {
         ecmaFeatures: {
-          jsx: true
+          jsx: true,
         },
         extraFileExtensions: [".vue"],
         parser: tseslint.parser,
-        sourceType: "module"
-      }
+        sourceType: "module",
+      },
     },
     plugins: {
       "@typescript-eslint": tseslint.plugin,
-      vue: pluginVue
+      vue: pluginVue,
     },
     processor: pluginVue.processors[".vue"],
     rules: {
@@ -163,28 +163,28 @@ export default defineConfig([
           html: {
             void: "always",
             normal: "always",
-            component: "always"
+            component: "always",
           },
           svg: "always",
-          math: "always"
-        }
-      ]
-    }
+          math: "always",
+        },
+      ],
+    },
   },
   {
     files: ["**/*.vue", "**/*.tsx"],
     plugins: {
-      "better-tailwindcss": eslintPluginBetterTailwindcss
+      "better-tailwindcss": eslintPluginBetterTailwindcss,
     },
     rules: {
       "better-tailwindcss/enforce-consistent-variable-syntax": "warn",
-      "better-tailwindcss/enforce-canonical-classes": "warn"
+      "better-tailwindcss/enforce-canonical-classes": "warn",
     },
     settings: {
       "better-tailwindcss": {
         entryPoint: "src/style/tailwind.css",
-        rootFontSize: 16
-      }
-    }
-  }
+        rootFontSize: 16,
+      },
+    },
+  },
 ]);

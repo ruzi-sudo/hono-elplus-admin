@@ -14,6 +14,7 @@ import { message } from "@/utils/message";
 import { $t, transformI18n } from "@/plugins/i18n";
 import { getToken, formatToken } from "@/utils/auth";
 import { useUserStoreHook } from "@/store/modules/user";
+import { getClientPublicIp } from "./public-ip";
 
 // 相关配置请参考：www.axios-js.com/zh-cn/docs/#axios-request-config-1
 const defaultConfig: AxiosRequestConfig = {
@@ -78,6 +79,11 @@ class PureHttp {
   private httpInterceptorsRequest(): void {
     PureHttp.axiosInstance.interceptors.request.use(
       async (config: PureHttpRequestConfig): Promise<any> => {
+        const publicIp = await getClientPublicIp();
+        if (publicIp) {
+          config.headers = config.headers || {};
+          config.headers["X-Client-Public-IP"] = publicIp;
+        }
         // 优先判断post/get等方法是否传入回调，否则执行初始化设置等回调
         if (typeof config.beforeRequestCallback === "function") {
           config.beforeRequestCallback(config);
